@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { adminApi } from "@/lib/admin-api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const AdminStats = () => {
@@ -8,24 +8,28 @@ const AdminStats = () => {
   const [monthlyData, setMonthlyData] = useState<{ month: string; count: number }[]>([]);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { count: tc } = await supabase.from("tb_agendamentos_triagem").select("*", { count: "exact", head: true });
-      setTriagemCount(tc || 0);
+    const fetchStats = async () => {
+      try {
+        const [triagensRes, alunosRes] = await Promise.all([
+          adminApi("list_triagens"),
+          adminApi("list_alunos"),
+        ]);
+        const triagens = triagensRes.data || [];
+        const alunos = alunosRes.data || [];
+        setTriagemCount(triagens.length);
+        setAlunosCount(alunos.filter((a: any) => a.acesso_liberado).length);
 
-      const { count: ac } = await supabase.from("tb_alunos").select("*", { count: "exact", head: true }).eq("acesso_liberado", true);
-      setAlunosCount(ac || 0);
-
-      // Monthly triagens (last 6 months)
-      const { data: triagens } = await supabase.from("tb_agendamentos_triagem").select("created_at");
-      const months: Record<string, number> = {};
-      triagens?.forEach((t) => {
-        const m = t.created_at?.slice(0, 7);
-        if (m) months[m] = (months[m] || 0) + 1;
-      });
-      const sorted = Object.entries(months).sort().slice(-6).map(([month, count]) => ({ month, count }));
-      setMonthlyData(sorted);
+        // Monthly triagens (last 6 months)
+        const months: Record<string, number> = {};
+        triagens.forEach((t: any) => {
+          const m = t.created_at?.slice(0, 7);
+          if (m) months[m] = (months[m] || 0) + 1;
+        });
+        const sorted = Object.entries(months).sort().slice(-6).map(([month, count]) => ({ month, count }));
+        setMonthlyData(sorted);
+      } catch {}
     };
-    fetch();
+    fetchStats();
   }, []);
 
   return (
