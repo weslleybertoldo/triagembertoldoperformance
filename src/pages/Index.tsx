@@ -7,11 +7,11 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="flex items-center justify-center py-8 px-4">
+      <header className="flex items-center justify-center pt-10 pb-2 px-4">
         <img
-          src="/icon-192.png"
+          src="/icon-512.png"
           alt="Team Bertoldo"
-          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl"
+          className="h-[150px] w-[150px] md:h-[200px] md:w-[200px] rounded-3xl object-contain"
         />
       </header>
 
