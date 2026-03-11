@@ -8,9 +8,11 @@ const Index = () => {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="flex items-center justify-center py-8 px-4">
-        <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight text-foreground">
-          Team Bertoldo
-        </h1>
+        <img
+          src="/icon-192.png"
+          alt="Team Bertoldo"
+          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl"
+        />
       </header>
 
       {/* Main Content */}

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -19,6 +19,12 @@ interface TagItem {
   nome: string;
   cor: string;
 }
+
+  const sendWhatsApp = (whatsapp: string | null, message: string) => {
+    if (!whatsapp) return;
+    const phone = whatsapp.replace(/\D/g, "");
+    window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
+  };
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -333,6 +339,23 @@ const AdminPanel = () => {
                         <button onClick={() => setSelectedTriagem(t)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground">
                           <Eye className="h-4 w-4" />
                         </button>
+                        {t.whatsapp && (
+                          <button
+                            onClick={() => {
+                              const dataFormatada = t.data_agendamento
+                                ? format(new Date(t.data_agendamento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                                : "";
+                              sendWhatsApp(
+                                t.whatsapp,
+                                `Olá ${t.nome}! Confirmamos seu agendamento para ${dataFormatada}. Qualquer dúvida estamos à disposição! - Team Bertoldo`
+                              );
+                            }}
+                            className="p-2 rounded-lg hover:bg-secondary text-green-500"
+                            title="WhatsApp"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </button>
+                        )}
                         <Popover>
                           <PopoverTrigger asChild>
                             <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground">
