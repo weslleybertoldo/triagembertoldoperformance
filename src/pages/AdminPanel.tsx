@@ -219,7 +219,11 @@ const AdminPanel = () => {
           <h2 className="text-lg font-heading font-semibold text-foreground">Painel Admin</h2>
         </div>
         <button
-          onClick={() => { sessionStorage.removeItem("admin_token"); setAuthenticated(false); }}
+          onClick={() => {
+            sessionStorage.clear();
+            setAuthenticated(false);
+            navigate("/");
+          }}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           Sair

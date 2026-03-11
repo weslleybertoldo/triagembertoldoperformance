@@ -7,7 +7,18 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
+import { generateSlots, fetchOccupiedSlots, isSlotBlocked } from "@/lib/calendar-utils";
 
 interface Aluno {
   id: string;
@@ -21,26 +32,12 @@ interface Aluno {
 const sendWhatsAppMessage = (whatsapp: string | null, message: string) => {
   if (!whatsapp) return;
   const phone = whatsapp.replace(/\D/g, "");
-  const url = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank");
+  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
 };
 
 interface Props {
   onCountChange?: (count: number) => void;
 }
-
-const generateSlots = (date: Date): Date[] => {
-  const slots: Date[] = [];
-  for (let h = 6; h < 20; h++) {
-    for (let m = 0; m < 60; m += 45) {
-      if (h === 19 && m > 15) break;
-      const slot = new Date(date);
-      slot.setHours(h, m, 0, 0);
-      slots.push(slot);
-    }
-  }
-  return slots;
-};
 
 const AdminAlunos = ({ onCountChange }: Props) => {
   const { toast } = useToast();
@@ -49,14 +46,18 @@ const AdminAlunos = ({ onCountChange }: Props) => {
   const [expandedAluno, setExpandedAluno] = useState<string | null>(null);
   const [consultas, setConsultas] = useState<any[]>([]);
 
-  // Manual scheduling state
-  const [scheduleModal, setScheduleModal] = useState<Aluno | null>(null);
+  // Schedule / Reschedule modal state
+  const [scheduleModal, setScheduleModal] = useState<{ aluno: Aluno; consultaId?: string } | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [observacao, setObservacao] = useState("");
   const [booking, setBooking] = useState(false);
-  const [existingConsultas, setExistingConsultas] = useState<string[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<Date[]>([]);
+
+  // Cancel dialog
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; aluno: Aluno; dataConsulta: string } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchAlunos = async () => {
     setLoading(true);
@@ -97,48 +98,51 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     toast({ title: `Consulta ${status}` });
   };
 
-  // Manual scheduling
-  const openScheduleModal = async (aluno: Aluno) => {
-    setScheduleModal(aluno);
+  // Open schedule or reschedule modal
+  const openScheduleModal = (aluno: Aluno, consultaId?: string) => {
+    setScheduleModal({ aluno, consultaId });
     setWeekOffset(0);
     setSelectedDay(null);
     setSelectedSlot(null);
     setObservacao("");
-    // Fetch all future consultas to block occupied slots
-    const { data } = await supabase
-      .from("tb_consultas")
-      .select("data_consulta")
-      .gte("data_consulta", new Date().toISOString());
-    setExistingConsultas((data || []).map((c: any) => c.data_consulta));
+    setBookedSlots([]);
   };
 
-  const isSlotOccupied = (slot: Date): boolean => {
-    return existingConsultas.some((dc) => {
-      const existing = new Date(dc);
-      const diff = Math.abs(slot.getTime() - existing.getTime());
-      return diff < 45 * 60 * 1000;
-    });
-  };
+  useEffect(() => {
+    if (!selectedDay || !scheduleModal) return;
+    fetchOccupiedSlots(selectedDay).then(setBookedSlots);
+  }, [selectedDay, scheduleModal]);
 
   const handleAdminBook = async () => {
     if (!selectedSlot || !scheduleModal) return;
     setBooking(true);
     try {
-      const { error } = await supabase.from("tb_consultas").insert({
-        aluno_id: scheduleModal.id,
-        data_consulta: selectedSlot.toISOString(),
-        status: "confirmada",
-        criado_por: "admin",
-        observacao: observacao || null,
-      });
-      if (error) throw error;
-      toast({ title: "Consulta agendada!", description: `${scheduleModal.nome} — ${format(selectedSlot, "dd/MM 'às' HH:mm")}` });
-      if (scheduleModal.whatsapp) {
-        const dataFormatada = format(selectedSlot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-        sendWhatsAppMessage(scheduleModal.whatsapp, `Olá ${scheduleModal.nome || ""}! ✅ Uma consulta foi agendada para o dia ${dataFormatada}. Nos vemos lá! — Team Bertoldo`);
+      if (scheduleModal.consultaId) {
+        // Reschedule
+        await supabase.from("tb_consultas").update({ data_consulta: selectedSlot.toISOString() }).eq("id", scheduleModal.consultaId);
+        toast({ title: "Consulta reagendada!", description: `${scheduleModal.aluno.nome} — ${format(selectedSlot, "dd/MM 'às' HH:mm")}` });
+        if (scheduleModal.aluno.whatsapp) {
+          const dataFormatada = format(selectedSlot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+          sendWhatsAppMessage(scheduleModal.aluno.whatsapp, `Olá ${scheduleModal.aluno.nome || ""}! Seu agendamento foi reagendado para ${dataFormatada}. — Team Bertoldo`);
+        }
+      } else {
+        // New booking
+        const { error } = await supabase.from("tb_consultas").insert({
+          aluno_id: scheduleModal.aluno.id,
+          data_consulta: selectedSlot.toISOString(),
+          status: "confirmada",
+          criado_por: "admin",
+          observacao: observacao || null,
+        });
+        if (error) throw error;
+        toast({ title: "Consulta agendada!", description: `${scheduleModal.aluno.nome} — ${format(selectedSlot, "dd/MM 'às' HH:mm")}` });
+        if (scheduleModal.aluno.whatsapp) {
+          const dataFormatada = format(selectedSlot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+          sendWhatsAppMessage(scheduleModal.aluno.whatsapp, `Olá ${scheduleModal.aluno.nome || ""}! ✅ Uma consulta foi agendada para o dia ${dataFormatada}. Nos vemos lá! — Team Bertoldo`);
+        }
       }
       setScheduleModal(null);
-      if (expandedAluno === scheduleModal.id) viewConsultas(scheduleModal.id);
+      if (expandedAluno) viewConsultas(expandedAluno);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -146,10 +150,29 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     }
   };
 
+  const handleCancelConsulta = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await supabase.from("tb_consultas").update({ status: "cancelada" }).eq("id", cancelTarget.id);
+      const dataFormatada = format(new Date(cancelTarget.dataConsulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+      if (cancelTarget.aluno.whatsapp) {
+        sendWhatsAppMessage(cancelTarget.aluno.whatsapp, `Olá ${cancelTarget.aluno.nome || ""}! Infelizmente precisamos cancelar seu agendamento de ${dataFormatada}. Entre em contato para reagendar. — Team Bertoldo`);
+      }
+      toast({ title: "Consulta cancelada" });
+      setCancelTarget(null);
+      if (expandedAluno) viewConsultas(expandedAluno);
+    } catch {
+      toast({ title: "Erro ao cancelar", variant: "destructive" });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const today = startOfDay(new Date());
-  const weekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
+  const wStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
+  const wEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: wStart, end: wEnd }).filter(
     (d) => !isWeekend(d) && !isBefore(d, today)
   );
   const slots = selectedDay ? generateSlots(selectedDay) : [];
@@ -184,7 +207,7 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                 {a.whatsapp && (
                   <button
                     onClick={() => sendWhatsAppMessage(a.whatsapp, `Olá ${a.nome || ""}! Tudo bem? — Team Bertoldo`)}
-                    className="text-sm text-green-500 hover:underline flex items-center gap-1"
+                    className="text-sm text-success hover:underline flex items-center gap-1"
                     title="WhatsApp"
                   >
                     <MessageCircle className="h-3 w-3" /> WhatsApp
@@ -214,16 +237,28 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                       {c.observacao && (
                         <p className="text-xs text-muted-foreground mt-1">{c.observacao}</p>
                       )}
-                      {c.status === "aguardando" && (
-                        <div className="flex gap-2 mt-2">
-                          <button onClick={() => updateConsultaStatus(c.id, "confirmada", c.data_consulta)} className="text-xs text-success hover:underline">
-                            ✅ Confirmar
-                          </button>
-                          <button onClick={() => updateConsultaStatus(c.id, "cancelada", c.data_consulta)} className="text-xs text-destructive hover:underline">
-                            ❌ Cancelar
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-2 mt-2">
+                        {c.status === "aguardando" && (
+                          <>
+                            <button onClick={() => updateConsultaStatus(c.id, "confirmada", c.data_consulta)} className="text-xs text-success hover:underline">
+                              ✅ Confirmar
+                            </button>
+                            <button onClick={() => setCancelTarget({ id: c.id, aluno: a, dataConsulta: c.data_consulta })} className="text-xs text-destructive hover:underline">
+                              ❌ Cancelar
+                            </button>
+                          </>
+                        )}
+                        {c.status === "confirmada" && (
+                          <>
+                            <button onClick={() => openScheduleModal(a, c.id)} className="text-xs text-primary hover:underline">
+                              ✏️ Alterar horário
+                            </button>
+                            <button onClick={() => setCancelTarget({ id: c.id, aluno: a, dataConsulta: c.data_consulta })} className="text-xs text-destructive hover:underline">
+                              ❌ Cancelar
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -234,30 +269,30 @@ const AdminAlunos = ({ onCountChange }: Props) => {
         {alunos.length === 0 && <p className="text-sm text-muted-foreground">Nenhum aluno cadastrado.</p>}
       </div>
 
-      {/* Manual Schedule Modal */}
+      {/* Schedule / Reschedule Modal */}
       <Dialog open={!!scheduleModal} onOpenChange={(open) => !open && setScheduleModal(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-heading">Agendar consulta</DialogTitle>
+            <DialogTitle className="font-heading">
+              {scheduleModal?.consultaId ? "Alterar horário" : "Agendar consulta"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="text-sm text-muted-foreground">Aluno</label>
-              <Input value={scheduleModal?.nome || scheduleModal?.email || ""} readOnly className="mt-1 bg-secondary/50" />
+              <Input value={scheduleModal?.aluno.nome || scheduleModal?.aluno.email || ""} readOnly className="mt-1 bg-secondary/50" />
             </div>
 
-            {/* Week navigation */}
             <div className="flex items-center justify-between">
               <button onClick={() => setWeekOffset((w) => Math.max(0, w - 1))} disabled={weekOffset === 0} className="p-2 rounded-full hover:bg-secondary disabled:opacity-30">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-medium">{format(weekStart, "dd MMM", { locale: ptBR })} — {format(weekEnd, "dd MMM", { locale: ptBR })}</span>
+              <span className="text-sm font-medium">{format(wStart, "dd MMM", { locale: ptBR })} — {format(wEnd, "dd MMM", { locale: ptBR })}</span>
               <button onClick={() => setWeekOffset((w) => w + 1)} className="p-2 rounded-full hover:bg-secondary">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Day selection */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {weekDays.map((day) => (
                 <button
@@ -273,18 +308,17 @@ const AdminAlunos = ({ onCountChange }: Props) => {
               ))}
             </div>
 
-            {/* Slot selection */}
             {selectedDay && (
               <div className="grid grid-cols-4 gap-1.5 max-h-[160px] overflow-y-auto">
                 {slots.filter((s) => s.getTime() > Date.now()).map((slot) => {
-                  const occupied = isSlotOccupied(slot);
+                  const blocked = isSlotBlocked(slot, bookedSlots);
                   return (
                     <button
                       key={slot.toISOString()}
-                      onClick={() => !occupied && setSelectedSlot(slot)}
-                      disabled={occupied}
+                      onClick={() => !blocked && setSelectedSlot(slot)}
+                      disabled={blocked}
                       className={`rounded-lg py-2 text-xs font-medium transition-all ${
-                        occupied
+                        blocked
                           ? "bg-muted text-muted-foreground cursor-not-allowed opacity-40"
                           : selectedSlot?.getTime() === slot.getTime()
                           ? "gradient-primary text-primary-foreground"
@@ -298,21 +332,41 @@ const AdminAlunos = ({ onCountChange }: Props) => {
               </div>
             )}
 
-            <div>
-              <label className="text-sm text-muted-foreground">Observação (opcional)</label>
-              <Input value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex: retorno mensal" className="mt-1" />
-            </div>
+            {!scheduleModal?.consultaId && (
+              <div>
+                <label className="text-sm text-muted-foreground">Observação (opcional)</label>
+                <Input value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex: retorno mensal" className="mt-1" />
+              </div>
+            )}
 
             <Button
               onClick={handleAdminBook}
               disabled={!selectedSlot || booking}
               className="w-full gradient-primary text-primary-foreground rounded-xl font-heading font-semibold"
             >
-              {booking ? "Agendando..." : "Confirmar agendamento"}
+              {booking ? (scheduleModal?.consultaId ? "Reagendando..." : "Agendando...") : (scheduleModal?.consultaId ? "Confirmar reagendamento" : "Confirmar agendamento")}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Confirmation */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar este agendamento? O aluno será notificado via WhatsApp.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConsulta} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {cancelling ? "Cancelando..." : "Sim, cancelar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
