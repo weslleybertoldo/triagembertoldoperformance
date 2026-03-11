@@ -120,6 +120,33 @@ serve(async (req) => {
         return json({ success: true });
       }
 
+      case "update_aluno": {
+        const { id, nome, email, whatsapp } = params;
+        const updateData: Record<string, unknown> = {};
+        if (nome !== undefined) updateData.nome = nome;
+        if (email !== undefined) updateData.email = email;
+        if (whatsapp !== undefined) updateData.whatsapp = whatsapp;
+        const { error } = await supabase
+          .from("tb_alunos")
+          .update(updateData)
+          .eq("id", id);
+        if (error) throw error;
+        return json({ success: true });
+      }
+
+      case "delete_aluno": {
+        const { id } = params;
+        // Delete consultas first
+        await supabase.from("tb_consultas").delete().eq("aluno_id", id);
+        // Delete aluno
+        const { error } = await supabase.from("tb_alunos").delete().eq("id", id);
+        if (error) throw error;
+        // Delete auth user
+        const { error: authError } = await supabase.auth.admin.deleteUser(id);
+        if (authError) console.error("Auth delete error:", authError.message);
+        return json({ success: true });
+      }
+
       // ===== CONSULTAS =====
       case "list_consultas": {
         const { aluno_id } = params;
