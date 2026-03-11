@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AlunoScheduler from "@/components/aluno/AlunoScheduler";
+import MeusDados from "@/components/aluno/MeusDados";
 import InstallAppButton from "@/components/pwa/InstallAppButton";
 import {
   AlertDialog,
@@ -26,6 +27,8 @@ interface Aluno {
   nome: string;
   foto_url: string | null;
   acesso_liberado: boolean;
+  whatsapp: string | null;
+  email: string | null;
 }
 
 interface Consulta {
@@ -221,11 +224,26 @@ const AlunoArea = () => {
       </header>
 
       <main className="flex-1 px-4 py-6 space-y-8">
+        <MeusDados aluno={aluno!} onUpdate={() => {
+          // Refresh aluno data
+          supabase.from("tb_alunos").select("*").eq("id", aluno!.id).single().then(({ data }) => {
+            if (data) setAluno(data);
+          });
+        }} />
+
         <section>
           <h3 className="text-lg font-heading font-bold text-foreground mb-4">
             Agendar Consulta
           </h3>
-          <AlunoScheduler alunoId={aluno!.id} onBooked={refreshConsultas} consultas={consultas} />
+          {!(aluno?.whatsapp && aluno.whatsapp.replace(/\D/g, "").length >= 10) ? (
+            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-4 text-center">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ Adicione seu WhatsApp em "Meus Dados" antes de agendar.
+              </p>
+            </div>
+          ) : (
+            <AlunoScheduler alunoId={aluno!.id} onBooked={refreshConsultas} consultas={consultas} />
+          )}
         </section>
 
         <section>
