@@ -27,6 +27,8 @@ interface Aluno {
   nome: string;
   foto_url: string | null;
   acesso_liberado: boolean;
+  whatsapp: string | null;
+  email: string | null;
 }
 
 interface Consulta {
