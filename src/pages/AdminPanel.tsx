@@ -59,7 +59,22 @@ const AdminPanel = () => {
   };
 
   useEffect(() => {
-    if (sessionStorage.getItem("admin_token")) setAuthenticated(true);
+    const token = sessionStorage.getItem("admin_token");
+    if (token) {
+      // Validate JWT expiration
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload.exp && payload.exp > Date.now() / 1000) {
+            setAuthenticated(true);
+            return;
+          }
+        }
+      } catch {}
+      // Invalid or expired token
+      sessionStorage.clear();
+    }
   }, []);
 
   useEffect(() => {
