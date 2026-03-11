@@ -232,6 +232,22 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                             <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">admin</span>
                           )}
                           <span className="text-xs">{c.status}</span>
+                          {a.whatsapp ? (
+                            <button
+                              onClick={() => {
+                                const dataFormatada = format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+                                sendWhatsAppMessage(a.whatsapp, `Olá ${a.nome || ""}! Seu agendamento está confirmado para ${dataFormatada}. Qualquer dúvida estamos à disposição! - Team Bertoldo`);
+                              }}
+                              className="p-1 rounded hover:bg-secondary text-success"
+                              title="Enviar WhatsApp"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <span className="p-1 text-muted-foreground opacity-40" title="WhatsApp não cadastrado">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </span>
+                          )}
                         </div>
                       </div>
                       {c.observacao && (
