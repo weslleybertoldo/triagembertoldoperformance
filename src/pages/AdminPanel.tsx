@@ -20,6 +20,12 @@ interface TagItem {
   cor: string;
 }
 
+  const sendWhatsApp = (whatsapp: string | null, message: string) => {
+    if (!whatsapp) return;
+    const phone = whatsapp.replace(/\D/g, "");
+    window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
 const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
