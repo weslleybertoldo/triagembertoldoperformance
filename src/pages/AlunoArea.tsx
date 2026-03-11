@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AlunoScheduler from "@/components/aluno/AlunoScheduler";
+import MeusDados from "@/components/aluno/MeusDados";
 import InstallAppButton from "@/components/pwa/InstallAppButton";
 import {
   AlertDialog,
