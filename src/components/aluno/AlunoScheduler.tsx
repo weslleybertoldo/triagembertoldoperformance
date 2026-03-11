@@ -1,29 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { generateSlots, fetchOccupiedSlots, isSlotBlocked } from "@/lib/calendar-utils";
 
 interface Props {
   alunoId: string;
   onBooked: () => void;
-  consultas: { data_consulta: string }[];
+  consultas: { data_consulta: string; status?: string }[];
 }
-
-const generateSlots = (date: Date): Date[] => {
-  const slots: Date[] = [];
-  for (let h = 6; h < 20; h++) {
-    for (let m = 0; m < 60; m += 45) {
-      if (h === 19 && m > 15) break;
-      const slot = new Date(date);
-      slot.setHours(h, m, 0, 0);
-      slots.push(slot);
-    }
-  }
-  return slots;
-};
 
 const AlunoScheduler = ({ alunoId, onBooked, consultas }: Props) => {
   const { toast } = useToast();
@@ -31,6 +19,7 @@ const AlunoScheduler = ({ alunoId, onBooked, consultas }: Props) => {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [booking, setBooking] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<Date[]>([]);
 
   const today = startOfDay(new Date());
   const weekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
@@ -40,11 +29,17 @@ const AlunoScheduler = ({ alunoId, onBooked, consultas }: Props) => {
     (d) => !isWeekend(d) && !isBefore(d, today)
   );
 
-  // Check if student already has appointment this week
+  // Check if student already has active appointment this week
   const hasAppointmentThisWeek = consultas.some((c) => {
+    if (c.status === "cancelada") return false;
     const d = new Date(c.data_consulta);
     return d >= weekStart && d <= weekEnd;
   });
+
+  useEffect(() => {
+    if (!selectedDay) return;
+    fetchOccupiedSlots(selectedDay).then(setBookedSlots);
+  }, [selectedDay]);
 
   const slots = selectedDay ? generateSlots(selectedDay) : [];
 
@@ -105,17 +100,25 @@ const AlunoScheduler = ({ alunoId, onBooked, consultas }: Props) => {
       {selectedDay && (
         <>
           <div className="grid grid-cols-3 gap-2 max-h-[200px] overflow-y-auto mb-4">
-            {slots.filter((s) => s.getTime() > Date.now()).map((slot) => (
-              <button
-                key={slot.toISOString()}
-                onClick={() => setSelectedSlot(slot)}
-                className={`rounded-lg py-3 text-sm font-medium transition-all ${
-                  selectedSlot?.getTime() === slot.getTime() ? "gradient-primary text-primary-foreground" : "bg-card border border-border hover:border-primary/30 text-foreground"
-                }`}
-              >
-                {format(slot, "HH:mm")}
-              </button>
-            ))}
+            {slots.filter((s) => s.getTime() > Date.now()).map((slot) => {
+              const blocked = isSlotBlocked(slot, bookedSlots);
+              return (
+                <button
+                  key={slot.toISOString()}
+                  onClick={() => !blocked && setSelectedSlot(slot)}
+                  disabled={blocked}
+                  className={`rounded-lg py-3 text-sm font-medium transition-all ${
+                    blocked
+                      ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                      : selectedSlot?.getTime() === slot.getTime()
+                      ? "gradient-primary text-primary-foreground"
+                      : "bg-card border border-border hover:border-primary/30 text-foreground"
+                  }`}
+                >
+                  {format(slot, "HH:mm")}
+                </button>
+              );
+            })}
           </div>
 
           {selectedSlot && (
