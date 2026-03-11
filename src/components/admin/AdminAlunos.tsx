@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MessageCircle, Eye, Pencil, Trash2 } from "lucide-react";
 import { generateSlots, fetchOccupiedSlots, isSlotBlocked } from "@/lib/calendar-utils";
 import { adminApi } from "@/lib/admin-api";
 
@@ -33,6 +33,13 @@ const sendWhatsAppMessage = (whatsapp: string | null, message: string) => {
   if (!whatsapp) return;
   const phone = whatsapp.replace(/\D/g, "");
   window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
+};
+
+const formatWhatsApp = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
 interface Props {
@@ -58,6 +65,15 @@ const AdminAlunos = ({ onCountChange }: Props) => {
   // Cancel dialog
   const [cancelTarget, setCancelTarget] = useState<{ id: string; aluno: Aluno; dataConsulta: string } | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // View/Edit/Delete modals
+  const [viewAluno, setViewAluno] = useState<Aluno | null>(null);
+  const [editAluno, setEditAluno] = useState<Aluno | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", email: "", whatsapp: "" });
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Aluno | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [viewConsultasList, setViewConsultasList] = useState<any[]>([]);
 
   const fetchAlunos = async () => {
     setLoading(true);
@@ -168,6 +184,64 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     }
   };
 
+  // View aluno details
+  const openViewAluno = async (aluno: Aluno) => {
+    setViewAluno(aluno);
+    try {
+      const res = await adminApi("list_consultas", { aluno_id: aluno.id });
+      setViewConsultasList(res.data || []);
+    } catch {
+      setViewConsultasList([]);
+    }
+  };
+
+  // Edit aluno
+  const openEditAluno = (aluno: Aluno) => {
+    setEditAluno(aluno);
+    setEditForm({
+      nome: aluno.nome || "",
+      email: aluno.email || "",
+      whatsapp: aluno.whatsapp || "",
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editAluno) return;
+    setEditSaving(true);
+    try {
+      await adminApi("update_aluno", {
+        id: editAluno.id,
+        nome: editForm.nome,
+        email: editForm.email,
+        whatsapp: editForm.whatsapp.replace(/\D/g, ""),
+      });
+      toast({ title: "Aluno atualizado!" });
+      setEditAluno(null);
+      fetchAlunos();
+    } catch (e: any) {
+      toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // Delete aluno
+  const handleDeleteAluno = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await adminApi("delete_aluno", { id: deleteTarget.id });
+      toast({ title: "Aluno excluído" });
+      setDeleteTarget(null);
+      if (expandedAluno === deleteTarget.id) setExpandedAluno(null);
+      fetchAlunos();
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const today = startOfDay(new Date());
   const wStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const wEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
@@ -196,12 +270,26 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                   <Switch checked={a.acesso_liberado} onCheckedChange={() => toggleAccess(a.id, a.acesso_liberado)} />
                 </div>
               </div>
-              <div className="flex gap-3 mt-2">
+
+              {/* Action icons row */}
+              <div className="flex gap-2 mt-3 border-t border-border pt-3">
+                <button onClick={() => openViewAluno(a)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Visualizar">
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button onClick={() => openEditAluno(a)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Editar">
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button onClick={() => setDeleteTarget(a)} className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Excluir">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+
+                <div className="flex-1" />
+
                 <button onClick={() => viewConsultas(a.id)} className="text-sm text-primary hover:underline">
                   {expandedAluno === a.id ? "Ocultar consultas" : "Ver consultas"}
                 </button>
                 <button onClick={() => openScheduleModal(a)} className="text-sm text-primary hover:underline flex items-center gap-1">
-                  <Plus className="h-3 w-3" /> Agendar consulta
+                  <Plus className="h-3 w-3" /> Agendar
                 </button>
                 {a.whatsapp && (
                   <button
@@ -378,6 +466,120 @@ const AdminAlunos = ({ onCountChange }: Props) => {
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelConsulta} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {cancelling ? "Cancelando..." : "Sim, cancelar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View Aluno Dialog */}
+      <Dialog open={!!viewAluno} onOpenChange={(open) => !open && setViewAluno(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Dados do Aluno</DialogTitle>
+          </DialogHeader>
+          {viewAluno && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Nome</label>
+                <p className="text-foreground font-medium">{viewAluno.nome || "—"}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Email</label>
+                <p className="text-foreground">{viewAluno.email || "—"}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">WhatsApp</label>
+                <p className="text-foreground">{viewAluno.whatsapp ? formatWhatsApp(viewAluno.whatsapp) : "Não cadastrado"}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Cadastro</label>
+                <p className="text-foreground">{viewAluno.created_at ? format(new Date(viewAluno.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "—"}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Acesso</label>
+                <p className={`font-medium ${viewAluno.acesso_liberado ? "text-success" : "text-destructive"}`}>
+                  {viewAluno.acesso_liberado ? "✅ Liberado" : "🔒 Bloqueado"}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Consultas</label>
+                {viewConsultasList.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Nenhuma consulta.</p>
+                ) : (
+                  <div className="space-y-1 mt-1">
+                    {viewConsultasList.map((c) => (
+                      <p key={c.id} className="text-sm text-foreground">
+                        {format(new Date(c.data_consulta), "dd/MM/yyyy HH:mm", { locale: ptBR })} — <span className="text-muted-foreground">{c.status}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Aluno Dialog */}
+      <Dialog open={!!editAluno} onOpenChange={(open) => !open && setEditAluno(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Editar Aluno</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground">Nome</label>
+              <Input value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Email</label>
+              <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">WhatsApp</label>
+              <Input
+                value={formatWhatsApp(editForm.whatsapp)}
+                onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })}
+                placeholder="(XX) XXXXX-XXXX"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-muted-foreground">Acesso liberado</label>
+              <Switch
+                checked={editAluno?.acesso_liberado || false}
+                onCheckedChange={async (checked) => {
+                  if (editAluno) {
+                    await adminApi("toggle_aluno_access", { id: editAluno.id, acesso_liberado: checked });
+                    setEditAluno({ ...editAluno, acesso_liberado: checked });
+                  }
+                }}
+              />
+            </div>
+            <Button
+              onClick={handleEditSave}
+              disabled={editSaving}
+              className="w-full gradient-primary text-primary-foreground rounded-xl font-heading font-semibold"
+            >
+              {editSaving ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir aluno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deleteTarget?.nome || deleteTarget?.email}</strong>? Esta ação não pode ser desfeita. Todas as consultas serão removidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAluno} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Sim, excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
