@@ -59,7 +59,22 @@ const AdminPanel = () => {
   };
 
   useEffect(() => {
-    if (sessionStorage.getItem("admin_token")) setAuthenticated(true);
+    const token = sessionStorage.getItem("admin_token");
+    if (token) {
+      // Validate JWT expiration
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload.exp && payload.exp > Date.now() / 1000) {
+            setAuthenticated(true);
+            return;
+          }
+        }
+      } catch {}
+      // Invalid or expired token
+      sessionStorage.clear();
+    }
   }, []);
 
   useEffect(() => {
@@ -219,7 +234,11 @@ const AdminPanel = () => {
           <h2 className="text-lg font-heading font-semibold text-foreground">Painel Admin</h2>
         </div>
         <button
-          onClick={() => { sessionStorage.removeItem("admin_token"); setAuthenticated(false); }}
+          onClick={() => {
+            sessionStorage.clear();
+            setAuthenticated(false);
+            navigate("/");
+          }}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           Sair

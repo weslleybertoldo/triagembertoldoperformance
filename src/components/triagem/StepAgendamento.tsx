@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   format,
-  addDays,
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
@@ -14,7 +13,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
+import { generateSlots, fetchOccupiedSlots, isSlotBlocked } from "@/lib/calendar-utils";
 import type { TriagemData } from "@/pages/TriagemForm";
 
 interface Props {
@@ -22,19 +21,6 @@ interface Props {
   update: (fields: Partial<TriagemData>) => void;
   onNext: () => void;
 }
-
-const generateSlots = (date: Date): Date[] => {
-  const slots: Date[] = [];
-  for (let h = 6; h < 20; h++) {
-    for (let m = 0; m < 60; m += 45) {
-      if (h === 19 && m > 15) break; // last slot must end by 20h
-      const slot = new Date(date);
-      slot.setHours(h, m, 0, 0);
-      slots.push(slot);
-    }
-  }
-  return slots;
-};
 
 const StepAgendamento = ({ data, update, onNext }: Props) => {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -53,50 +39,10 @@ const StepAgendamento = ({ data, update, onNext }: Props) => {
     [weekOffset]
   );
 
-  // Fetch booked slots for the selected day
   useEffect(() => {
     if (!selectedDay) return;
-    const dayStart = new Date(selectedDay);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(selectedDay);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    const fetchBooked = async () => {
-      // Fetch from both triagem and consultas tables
-      const { data: triagem } = await supabase
-        .from("tb_agendamentos_triagem")
-        .select("data_agendamento")
-        .gte("data_agendamento", dayStart.toISOString())
-        .lte("data_agendamento", dayEnd.toISOString())
-        .neq("status", "cancelado");
-
-      const { data: consultas } = await supabase
-        .from("tb_consultas")
-        .select("data_consulta")
-        .gte("data_consulta", dayStart.toISOString())
-        .lte("data_consulta", dayEnd.toISOString())
-        .neq("status", "cancelada");
-
-      const booked: Date[] = [];
-      triagem?.forEach((r) => booked.push(new Date(r.data_agendamento)));
-      consultas?.forEach((r) => booked.push(new Date(r.data_consulta)));
-      setBookedSlots(booked);
-    };
-    fetchBooked();
+    fetchOccupiedSlots(selectedDay).then(setBookedSlots);
   }, [selectedDay]);
-
-  const isSlotBlocked = (slot: Date) => {
-    for (const booked of bookedSlots) {
-      const bookedStart = booked.getTime();
-      const bookedEnd = bookedStart + 45 * 60 * 1000;
-      const slotStart = slot.getTime();
-      const slotEnd = slotStart + 45 * 60 * 1000;
-      if (slotStart < bookedEnd && slotEnd > bookedStart) return true;
-    }
-    // Also block past slots
-    if (slot.getTime() < Date.now()) return true;
-    return false;
-  };
 
   const slots = selectedDay ? generateSlots(selectedDay) : [];
 
@@ -109,7 +55,6 @@ const StepAgendamento = ({ data, update, onNext }: Props) => {
         Escolha o melhor dia e horário.
       </p>
 
-      {/* Week navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
@@ -130,7 +75,6 @@ const StepAgendamento = ({ data, update, onNext }: Props) => {
         </button>
       </div>
 
-      {/* Day selector */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         {weekDays.map((day) => (
           <button
@@ -157,11 +101,10 @@ const StepAgendamento = ({ data, update, onNext }: Props) => {
         )}
       </div>
 
-      {/* Time slots */}
       {selectedDay && (
         <div className="grid grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
           {slots.map((slot) => {
-            const blocked = isSlotBlocked(slot);
+            const blocked = isSlotBlocked(slot, bookedSlots);
             const selected =
               data.dataAgendamento &&
               slot.getTime() === data.dataAgendamento.getTime();
