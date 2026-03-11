@@ -7,16 +7,16 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="flex items-center justify-center py-8 px-4">
+      <header className="flex items-center justify-center pt-10 pb-2 px-4">
         <img
-          src="/icon-192.png"
+          src="/icon-512.png"
           alt="Team Bertoldo"
-          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl"
+          className="h-[150px] w-[150px] md:h-[200px] md:w-[200px] rounded-3xl object-contain"
         />
       </header>
 
       {/* Main Content */}
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-24">
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-24 mt-8">
         <button
           onClick={() => navigate("/triagem")}
           className="w-full max-w-sm rounded-2xl gradient-primary p-8 text-center shadow-card transition-all duration-200 hover:shadow-card-hover hover:scale-[1.02] active:scale-[0.98]"

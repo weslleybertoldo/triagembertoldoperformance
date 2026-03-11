@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
 import { generateSlots, fetchOccupiedSlots, isSlotBlocked } from "@/lib/calendar-utils";
+import { adminApi } from "@/lib/admin-api";
 
 interface Aluno {
   id: string;
@@ -61,29 +61,34 @@ const AdminAlunos = ({ onCountChange }: Props) => {
 
   const fetchAlunos = async () => {
     setLoading(true);
-    const { data } = await supabase.from("tb_alunos").select("*").order("created_at", { ascending: false });
-    setAlunos(data || []);
-    onCountChange?.((data || []).length);
+    try {
+      const res = await adminApi("list_alunos");
+      const data = res.data || [];
+      setAlunos(data);
+      onCountChange?.(data.length);
+    } catch {}
     setLoading(false);
   };
 
   useEffect(() => { fetchAlunos(); }, []);
 
   const toggleAccess = async (id: string, current: boolean) => {
-    await supabase.from("tb_alunos").update({ acesso_liberado: !current }).eq("id", id);
+    await adminApi("toggle_aluno_access", { id, acesso_liberado: !current });
     fetchAlunos();
     toast({ title: !current ? "Acesso liberado" : "Acesso bloqueado" });
   };
 
   const viewConsultas = async (alunoId: string) => {
     if (expandedAluno === alunoId) { setExpandedAluno(null); return; }
-    const { data } = await supabase.from("tb_consultas").select("*").eq("aluno_id", alunoId).order("data_consulta", { ascending: false });
-    setConsultas(data || []);
-    setExpandedAluno(alunoId);
+    try {
+      const res = await adminApi("list_consultas", { aluno_id: alunoId });
+      setConsultas(res.data || []);
+      setExpandedAluno(alunoId);
+    } catch {}
   };
 
   const updateConsultaStatus = async (id: string, status: string, dataConsulta: string) => {
-    await supabase.from("tb_consultas").update({ status }).eq("id", id);
+    await adminApi("update_consulta_status", { id, status });
     if (expandedAluno) {
       viewConsultas(expandedAluno);
       const aluno = alunos.find((a) => a.id === expandedAluno);
@@ -98,7 +103,6 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     toast({ title: `Consulta ${status}` });
   };
 
-  // Open schedule or reschedule modal
   const openScheduleModal = (aluno: Aluno, consultaId?: string) => {
     setScheduleModal({ aluno, consultaId });
     setWeekOffset(0);
@@ -118,23 +122,18 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     setBooking(true);
     try {
       if (scheduleModal.consultaId) {
-        // Reschedule
-        await supabase.from("tb_consultas").update({ data_consulta: selectedSlot.toISOString() }).eq("id", scheduleModal.consultaId);
+        await adminApi("reschedule_consulta", { id: scheduleModal.consultaId, data_consulta: selectedSlot.toISOString() });
         toast({ title: "Consulta reagendada!", description: `${scheduleModal.aluno.nome} — ${format(selectedSlot, "dd/MM 'às' HH:mm")}` });
         if (scheduleModal.aluno.whatsapp) {
           const dataFormatada = format(selectedSlot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
           sendWhatsAppMessage(scheduleModal.aluno.whatsapp, `Olá ${scheduleModal.aluno.nome || ""}! Seu agendamento foi reagendado para ${dataFormatada}. — Team Bertoldo`);
         }
       } else {
-        // New booking
-        const { error } = await supabase.from("tb_consultas").insert({
+        await adminApi("create_consulta", {
           aluno_id: scheduleModal.aluno.id,
           data_consulta: selectedSlot.toISOString(),
-          status: "confirmada",
-          criado_por: "admin",
           observacao: observacao || null,
         });
-        if (error) throw error;
         toast({ title: "Consulta agendada!", description: `${scheduleModal.aluno.nome} — ${format(selectedSlot, "dd/MM 'às' HH:mm")}` });
         if (scheduleModal.aluno.whatsapp) {
           const dataFormatada = format(selectedSlot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
@@ -154,7 +153,7 @@ const AdminAlunos = ({ onCountChange }: Props) => {
     if (!cancelTarget) return;
     setCancelling(true);
     try {
-      await supabase.from("tb_consultas").update({ status: "cancelada" }).eq("id", cancelTarget.id);
+      await adminApi("update_consulta_status", { id: cancelTarget.id, status: "cancelada" });
       const dataFormatada = format(new Date(cancelTarget.dataConsulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
       if (cancelTarget.aluno.whatsapp) {
         sendWhatsAppMessage(cancelTarget.aluno.whatsapp, `Olá ${cancelTarget.aluno.nome || ""}! Infelizmente precisamos cancelar seu agendamento de ${dataFormatada}. Entre em contato para reagendar. — Team Bertoldo`);
@@ -232,6 +231,22 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                             <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">admin</span>
                           )}
                           <span className="text-xs">{c.status}</span>
+                          {a.whatsapp ? (
+                            <button
+                              onClick={() => {
+                                const dataFormatada = format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+                                sendWhatsAppMessage(a.whatsapp, `Olá ${a.nome || ""}! Seu agendamento está confirmado para ${dataFormatada}. Qualquer dúvida estamos à disposição! - Team Bertoldo`);
+                              }}
+                              className="p-1 rounded hover:bg-secondary text-success"
+                              title="Enviar WhatsApp"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <span className="p-1 text-muted-foreground opacity-40" title="WhatsApp não cadastrado">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </span>
+                          )}
                         </div>
                       </div>
                       {c.observacao && (

@@ -13,6 +13,7 @@ import AdminTriagemDetail from "@/components/admin/AdminTriagemDetail";
 import AdminAlunos from "@/components/admin/AdminAlunos";
 import AdminStats from "@/components/admin/AdminStats";
 import AdminTags from "@/components/admin/AdminTags";
+import { adminApi } from "@/lib/admin-api";
 
 interface TagItem {
   id: string;
@@ -20,11 +21,11 @@ interface TagItem {
   cor: string;
 }
 
-  const sendWhatsApp = (whatsapp: string | null, message: string) => {
-    if (!whatsapp) return;
-    const phone = whatsapp.replace(/\D/g, "");
-    window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
-  };
+const sendWhatsApp = (whatsapp: string | null, message: string) => {
+  if (!whatsapp) return;
+  const phone = whatsapp.replace(/\D/g, "");
+  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank");
+};
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -51,7 +52,8 @@ const AdminPanel = () => {
         setAuthenticated(true);
         sessionStorage.setItem("admin_token", res.data.token);
       } else {
-        toast({ title: "Erro", description: "Credenciais inválidas", variant: "destructive" });
+        const errorMsg = res.data?.error || "Credenciais inválidas";
+        toast({ title: "Erro", description: errorMsg, variant: "destructive" });
       }
     } catch {
       toast({ title: "Erro", description: "Falha na autenticação", variant: "destructive" });
@@ -61,7 +63,6 @@ const AdminPanel = () => {
   useEffect(() => {
     const token = sessionStorage.getItem("admin_token");
     if (token) {
-      // Validate JWT expiration
       try {
         const parts = token.split(".");
         if (parts.length === 3) {
@@ -72,7 +73,6 @@ const AdminPanel = () => {
           }
         }
       } catch {}
-      // Invalid or expired token
       sessionStorage.clear();
     }
   }, []);
@@ -87,37 +87,44 @@ const AdminPanel = () => {
 
   const fetchTriagens = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("tb_agendamentos_triagem")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setTriagens(data || []);
-    setTriagemAguardando((data || []).filter((t: any) => t.status === "aguardando").length);
+    try {
+      const res = await adminApi("list_triagens");
+      const data = res.data || [];
+      setTriagens(data);
+      setTriagemAguardando(data.filter((t: any) => t.status === "aguardando").length);
+    } catch (e: any) {
+      if (e.message === "Not authenticated") {
+        sessionStorage.clear();
+        setAuthenticated(false);
+      }
+    }
     setLoading(false);
   };
 
   const fetchTags = async () => {
-    const { data } = await supabase.from("tb_tags").select("*").order("created_at", { ascending: false });
-    if (data && data.length === 0) {
-      await supabase.from("tb_tags").insert([
-        { nome: "Contatado", cor: "#22c55e" },
-        { nome: "Agendado", cor: "#3b82f6" },
-        { nome: "Não respondeu", cor: "#ef4444" },
-      ]);
-      const { data: newData } = await supabase.from("tb_tags").select("*").order("created_at", { ascending: false });
-      setTags(newData || []);
-    } else {
-      setTags(data || []);
-    }
+    try {
+      const res = await adminApi("list_tags");
+      const data = res.data || [];
+      if (data.length === 0) {
+        const seedRes = await adminApi("seed_tags", {
+          tags: [
+            { nome: "Contatado", cor: "#22c55e" },
+            { nome: "Agendado", cor: "#3b82f6" },
+            { nome: "Não respondeu", cor: "#ef4444" },
+          ],
+        });
+        setTags(seedRes.data || []);
+      } else {
+        setTags(data);
+      }
+    } catch {}
   };
 
   const fetchCounts = async () => {
-    const hoje = new Date().toISOString();
-    const { count } = await supabase
-      .from("tb_consultas")
-      .select("*", { count: "exact", head: true })
-      .or(`status.eq.aguardando,and(status.eq.confirmada,data_consulta.gte.${hoje})`);
-    setConsultasPendentes(count || 0);
+    try {
+      const res = await adminApi("count_pending_consultas");
+      setConsultasPendentes(res.count || 0);
+    } catch {}
   };
 
   const toggleTag = async (triagemId: string, currentTags: string[] | null, tagNome: string) => {
@@ -125,12 +132,12 @@ const AdminPanel = () => {
     const updated = current.includes(tagNome)
       ? current.filter((t) => t !== tagNome)
       : [...current, tagNome];
-    await supabase.from("tb_agendamentos_triagem").update({ tags: updated }).eq("id", triagemId);
+    await adminApi("update_triagem_tags", { id: triagemId, tags: updated });
     fetchTriagens();
   };
 
   const deleteTriagem = async (id: string) => {
-    await supabase.from("tb_agendamentos_triagem").delete().eq("id", id);
+    await adminApi("delete_triagem", { id });
     fetchTriagens();
     toast({ title: "Excluído" });
   };
@@ -210,7 +217,7 @@ const AdminPanel = () => {
         <main className="flex flex-1 flex-col items-center justify-center px-6">
           <div className="w-full max-w-sm space-y-4">
             <Input placeholder="Usuário" value={user} onChange={(e) => setUser(e.target.value)} className="py-5" />
-            <Input placeholder="Senha" type="password" value={pass} onChange={(e) => setPass(e.target.value)} className="py-5" />
+            <Input placeholder="Senha" type="password" value={pass} onChange={(e) => setPass(e.target.value)} className="py-5" onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
             <Button onClick={handleLogin} className="w-full py-5 font-heading font-semibold gradient-primary text-primary-foreground rounded-xl">
               Entrar
             </Button>
@@ -245,7 +252,6 @@ const AdminPanel = () => {
         </button>
       </header>
 
-      {/* Tabs */}
       <div className="flex border-b border-border">
         {(["triagens", "alunos", "config"] as const).map((t) => (
           <button
@@ -273,7 +279,6 @@ const AdminPanel = () => {
       <main className="flex-1 px-4 py-4">
         {tab === "triagens" && (
           <div>
-            {/* Search + Export */}
             <div className="flex gap-2 mb-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -289,7 +294,6 @@ const AdminPanel = () => {
               </Button>
             </div>
 
-            {/* Tag Filters */}
             {tags.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 mb-4">
                 <span className="text-xs text-muted-foreground mr-1">Filtrar:</span>
@@ -369,7 +373,7 @@ const AdminPanel = () => {
                                 `Olá ${t.nome}! Confirmamos seu agendamento para ${dataFormatada}. Qualquer dúvida estamos à disposição! - Team Bertoldo`
                               );
                             }}
-                            className="p-2 rounded-lg hover:bg-secondary text-green-500"
+                            className="p-2 rounded-lg hover:bg-secondary text-success"
                             title="WhatsApp"
                           >
                             <MessageCircle className="h-4 w-4" />

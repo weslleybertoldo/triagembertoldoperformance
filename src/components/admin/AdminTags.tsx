@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { adminApi } from "@/lib/admin-api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -22,15 +22,17 @@ const AdminTags = ({ onTagsChange }: Props) => {
   const [cor, setCor] = useState("#1a5632");
 
   const fetchTags = async () => {
-    const { data } = await supabase.from("tb_tags").select("*").order("created_at", { ascending: false });
-    setTags(data || []);
+    try {
+      const res = await adminApi("list_tags");
+      setTags(res.data || []);
+    } catch {}
   };
 
   useEffect(() => { fetchTags(); }, []);
 
   const addTag = async () => {
     if (!nome.trim()) return;
-    await supabase.from("tb_tags").insert({ nome, cor });
+    await adminApi("create_tag", { nome, cor });
     setNome("");
     fetchTags();
     onTagsChange?.();
@@ -38,7 +40,7 @@ const AdminTags = ({ onTagsChange }: Props) => {
   };
 
   const deleteTag = async (id: string) => {
-    await supabase.from("tb_tags").delete().eq("id", id);
+    await adminApi("delete_tag", { id });
     fetchTags();
     onTagsChange?.();
   };
