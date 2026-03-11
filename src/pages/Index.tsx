@@ -16,7 +16,7 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-24">
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-24 mt-8">
         <button
           onClick={() => navigate("/triagem")}
           className="w-full max-w-sm rounded-2xl gradient-primary p-8 text-center shadow-card transition-all duration-200 hover:shadow-card-hover hover:scale-[1.02] active:scale-[0.98]"
