@@ -255,23 +255,23 @@ const AdminPanel = () => {
       </header>
 
       <div className="flex border-b border-border">
-        {(["triagens", "alunos", "config"] as const).map((t) => (
+        {([
+          { key: "triagens" as const, label: "Triagens", badge: triagemAguardando },
+          { key: "alunos" as const, label: "Alunos", badge: consultasPendentes },
+          { key: "stats" as const, icon: <BarChart2 className="h-4 w-4" />, badge: 0 },
+          { key: "config" as const, icon: <Settings className="h-4 w-4" />, badge: 0 },
+        ]).map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`relative flex-1 py-3 text-sm font-heading font-medium transition-colors ${
-              tab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`relative flex-1 py-3 text-sm font-heading font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              tab === t.key ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t === "triagens" ? "Triagens" : t === "alunos" ? "Alunos" : "⚙️"}
-            {t === "triagens" && triagemAguardando > 0 && (
+            {t.icon || t.label}
+            {t.badge > 0 && (
               <span className="absolute -top-1 right-1/4 inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-success text-[10px] font-bold text-white px-1">
-                {triagemAguardando}
-              </span>
-            )}
-            {t === "alunos" && consultasPendentes > 0 && (
-              <span className="absolute -top-1 right-1/4 inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-success text-[10px] font-bold text-white px-1">
-                {consultasPendentes}
+                {t.badge}
               </span>
             )}
           </button>
