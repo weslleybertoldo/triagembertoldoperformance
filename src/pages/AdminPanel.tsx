@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X, MessageCircle } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X, MessageCircle, BarChart2, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import AdminAlunos from "@/components/admin/AdminAlunos";
 import AdminStats from "@/components/admin/AdminStats";
 import AdminTags from "@/components/admin/AdminTags";
 import AdminConfigTriagem from "@/components/admin/AdminConfigTriagem";
+import AdminAdmins from "@/components/admin/AdminAdmins";
 import { adminApi } from "@/lib/admin-api";
 
 interface TagItem {
