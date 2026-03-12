@@ -13,6 +13,7 @@ import AdminTriagemDetail from "@/components/admin/AdminTriagemDetail";
 import AdminAlunos from "@/components/admin/AdminAlunos";
 import AdminStats from "@/components/admin/AdminStats";
 import AdminTags from "@/components/admin/AdminTags";
+import AdminConfigTriagem from "@/components/admin/AdminConfigTriagem";
 import { adminApi } from "@/lib/admin-api";
 
 interface TagItem {
