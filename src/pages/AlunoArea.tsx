@@ -186,6 +186,16 @@ const AlunoArea = () => {
   );
   const rescheduleSlots = selectedDay ? generateSlots(selectedDay) : [];
 
+  const consultasFiltradas = useMemo(() => {
+    return consultas.filter((c) => {
+      if (!filtroMes) return true;
+      const d = new Date(c.data_consulta);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === filtroMes;
+    });
+  }, [consultas, filtroMes]);
+
+  const consultasVisiveis = mostrarTodas ? consultasFiltradas : consultasFiltradas.slice(0, 6);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
