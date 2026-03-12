@@ -204,6 +204,16 @@ serve(async (req) => {
         return json({ success: true });
       }
 
+      case "delete_consulta": {
+        const { id } = params;
+        const { error } = await supabase
+          .from("tb_consultas")
+          .delete()
+          .eq("id", id);
+        if (error) throw error;
+        return json({ success: true });
+      }
+
       // ===== TAGS =====
       case "list_tags": {
         const { data, error } = await supabase

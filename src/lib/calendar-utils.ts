@@ -25,13 +25,13 @@ export const fetchOccupiedSlots = async (day: Date): Promise<Date[]> => {
       .select("data_agendamento")
       .gte("data_agendamento", dayStart.toISOString())
       .lte("data_agendamento", dayEnd.toISOString())
-      .neq("status", "cancelado"),
+      .in("status", ["aguardando", "confirmada", "pendente"]),
     supabase
       .from("tb_consultas")
       .select("data_consulta")
       .gte("data_consulta", dayStart.toISOString())
       .lte("data_consulta", dayEnd.toISOString())
-      .neq("status", "cancelada"),
+      .in("status", ["aguardando", "confirmada", "pendente"]),
   ]);
 
   const booked: Date[] = [];

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut, ChevronLeft, ChevronRight } from "lucide-react";
@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 import AlunoScheduler from "@/components/aluno/AlunoScheduler";
 import MeusDados from "@/components/aluno/MeusDados";
 import InstallAppButton from "@/components/pwa/InstallAppButton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,21 @@ interface Aluno {
   email: string | null;
 }
 
+const NOMES_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const LISTA_MESES = (() => {
+  const meses = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    meses.push({
+      valor: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: `${NOMES_MESES[d.getMonth()]} ${d.getFullYear()}`,
+    });
+  }
+  return meses;
+})();
+
 interface Consulta {
   id: string;
   data_consulta: string;
@@ -46,6 +62,8 @@ const AlunoArea = () => {
   const [loading, setLoading] = useState(true);
   const [cancelTarget, setCancelTarget] = useState<Consulta | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [filtroMes, setFiltroMes] = useState("");
+  const [mostrarTodas, setMostrarTodas] = useState(false);
 
   // Reschedule state
   const [rescheduleTarget, setRescheduleTarget] = useState<Consulta | null>(null);
@@ -168,6 +186,16 @@ const AlunoArea = () => {
   );
   const rescheduleSlots = selectedDay ? generateSlots(selectedDay) : [];
 
+  const consultasFiltradas = useMemo(() => {
+    return consultas.filter((c) => {
+      if (!filtroMes) return true;
+      const d = new Date(c.data_consulta);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === filtroMes;
+    });
+  }, [consultas, filtroMes]);
+
+  const consultasVisiveis = mostrarTodas ? consultasFiltradas : consultasFiltradas.slice(0, 6);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -253,41 +281,66 @@ const AlunoArea = () => {
           {consultas.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhuma consulta agendada.</p>
           ) : (
-            <div className="space-y-3">
-              {consultas.map((c) => (
-                <div key={c.id} className="rounded-xl bg-card border border-border p-4 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">
-                      {format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </p>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[c.status] || ""}`}>
-                      {statusEmoji[c.status] || ""} {c.status}
-                    </span>
-                  </div>
-                  {c.observacao && (
-                    <p className="text-sm text-muted-foreground mt-2">{c.observacao}</p>
-                  )}
-                  {(c.status === "aguardando" || c.status === "confirmada") && (
-                    <div className="flex gap-3 mt-3">
-                      {canReschedule(c) && (
-                        <button
-                          onClick={() => openReschedule(c)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          ✏️ Reagendar
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setCancelTarget(c)}
-                        className="text-xs text-destructive hover:underline"
-                      >
-                        ❌ Cancelar
-                      </button>
+            <>
+              <div className="flex gap-2 items-center flex-wrap mb-3">
+                <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v === "all" ? "" : v); setMostrarTodas(false); }}>
+                  <SelectTrigger className="w-[180px] h-9 text-sm">
+                    <SelectValue placeholder="Todos os meses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os meses</SelectItem>
+                    {LISTA_MESES.map((m) => (
+                      <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {consultasFiltradas.length > 6 && !mostrarTodas && (
+                  <button onClick={() => setMostrarTodas(true)} className="text-xs text-primary hover:underline">
+                    Ver todas ({consultasFiltradas.length})
+                  </button>
+                )}
+                {mostrarTodas && (
+                  <button onClick={() => setMostrarTodas(false)} className="text-xs text-primary hover:underline">
+                    Mostrar menos
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {consultasVisiveis.map((c) => (
+                  <div key={c.id} className="rounded-xl bg-card border border-border p-4 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-foreground">
+                        {format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[c.status] || ""}`}>
+                        {statusEmoji[c.status] || ""} {c.status}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    {c.observacao && (
+                      <p className="text-sm text-muted-foreground mt-2">{c.observacao}</p>
+                    )}
+                    {(c.status === "aguardando" || c.status === "confirmada") && (
+                      <div className="flex gap-3 mt-3">
+                        {canReschedule(c) && (
+                          <button
+                            onClick={() => openReschedule(c)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            ✏️ Reagendar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setCancelTarget(c)}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          ❌ Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </main>

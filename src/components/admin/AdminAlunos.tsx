@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -42,6 +43,25 @@ const formatWhatsApp = (value: string): string => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+// Month filter helpers
+const NOMES_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function gerarUltimosMeses(qtd: number) {
+  const meses = [];
+  for (let i = 0; i < qtd; i++) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    meses.push({
+      valor: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: `${NOMES_MESES[d.getMonth()]} ${d.getFullYear()}`,
+    });
+  }
+  return meses;
+}
+
+const LISTA_MESES = gerarUltimosMeses(6);
+
 interface Props {
   onCountChange?: (count: number) => void;
 }
@@ -52,6 +72,10 @@ const AdminAlunos = ({ onCountChange }: Props) => {
   const [loading, setLoading] = useState(true);
   const [expandedAluno, setExpandedAluno] = useState<string | null>(null);
   const [consultas, setConsultas] = useState<any[]>([]);
+
+  // Month filter state per expanded aluno
+  const [filtroMes, setFiltroMes] = useState("");
+  const [mostrarTodas, setMostrarTodas] = useState(false);
 
   // Schedule / Reschedule modal state
   const [scheduleModal, setScheduleModal] = useState<{ aluno: Aluno; consultaId?: string } | null>(null);
@@ -65,6 +89,10 @@ const AdminAlunos = ({ onCountChange }: Props) => {
   // Cancel dialog
   const [cancelTarget, setCancelTarget] = useState<{ id: string; aluno: Aluno; dataConsulta: string } | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // Delete consulta dialog
+  const [deleteConsultaTarget, setDeleteConsultaTarget] = useState<{ id: string; dataConsulta: string } | null>(null);
+  const [deletingConsulta, setDeletingConsulta] = useState(false);
 
   // View/Edit/Delete modals
   const [viewAluno, setViewAluno] = useState<Aluno | null>(null);
@@ -100,8 +128,21 @@ const AdminAlunos = ({ onCountChange }: Props) => {
       const res = await adminApi("list_consultas", { aluno_id: alunoId });
       setConsultas(res.data || []);
       setExpandedAluno(alunoId);
+      setFiltroMes("");
+      setMostrarTodas(false);
     } catch {}
   };
+
+  // Filtered consultas with month filter
+  const consultasFiltradas = useMemo(() => {
+    return consultas.filter((c) => {
+      if (!filtroMes) return true;
+      const d = new Date(c.data_consulta);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === filtroMes;
+    });
+  }, [consultas, filtroMes]);
+
+  const consultasVisiveis = mostrarTodas ? consultasFiltradas : consultasFiltradas.slice(0, 6);
 
   const updateConsultaStatus = async (id: string, status: string, dataConsulta: string) => {
     await adminApi("update_consulta_status", { id, status });
@@ -181,6 +222,21 @@ const AdminAlunos = ({ onCountChange }: Props) => {
       toast({ title: "Erro ao cancelar", variant: "destructive" });
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleDeleteConsulta = async () => {
+    if (!deleteConsultaTarget) return;
+    setDeletingConsulta(true);
+    try {
+      await adminApi("delete_consulta", { id: deleteConsultaTarget.id });
+      toast({ title: "Agendamento excluído" });
+      setDeleteConsultaTarget(null);
+      if (expandedAluno) viewConsultas(expandedAluno);
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+    } finally {
+      setDeletingConsulta(false);
     }
   };
 
@@ -305,10 +361,35 @@ const AdminAlunos = ({ onCountChange }: Props) => {
 
             {expandedAluno === a.id && (
               <div className="ml-4 mt-2 space-y-2">
-                {consultas.length === 0 ? (
+                {/* Month filter */}
+                <div className="flex gap-2 items-center flex-wrap">
+                  <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v === "all" ? "" : v); setMostrarTodas(false); }}>
+                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                      <SelectValue placeholder="Todos os meses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os meses</SelectItem>
+                      {LISTA_MESES.map((m) => (
+                        <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {consultasFiltradas.length > 6 && !mostrarTodas && (
+                    <button onClick={() => setMostrarTodas(true)} className="text-xs text-primary hover:underline">
+                      Ver todas ({consultasFiltradas.length})
+                    </button>
+                  )}
+                  {mostrarTodas && (
+                    <button onClick={() => setMostrarTodas(false)} className="text-xs text-primary hover:underline">
+                      Mostrar menos
+                    </button>
+                  )}
+                </div>
+
+                {consultasVisiveis.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhuma consulta.</p>
                 ) : (
-                  consultas.map((c) => (
+                  consultasVisiveis.map((c) => (
                     <div key={c.id} className="rounded-lg bg-secondary/50 p-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-foreground">
@@ -361,6 +442,12 @@ const AdminAlunos = ({ onCountChange }: Props) => {
                             </button>
                           </>
                         )}
+                        <button
+                          onClick={() => setDeleteConsultaTarget({ id: c.id, dataConsulta: c.data_consulta })}
+                          className="text-xs text-destructive hover:underline border border-destructive/30 rounded px-2 py-0.5"
+                        >
+                          🗑 Excluir
+                        </button>
                       </div>
                     </div>
                   ))
@@ -466,6 +553,24 @@ const AdminAlunos = ({ onCountChange }: Props) => {
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelConsulta} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {cancelling ? "Cancelando..." : "Sim, cancelar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Consulta Confirmation */}
+      <AlertDialog open={!!deleteConsultaTarget} onOpenChange={(open) => !open && setDeleteConsultaTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir agendamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Excluir este agendamento permanentemente? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConsulta} disabled={deletingConsulta} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deletingConsulta ? "Excluindo..." : "Sim, excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

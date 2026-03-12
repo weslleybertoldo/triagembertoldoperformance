@@ -92,6 +92,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tb_config_triagem: {
+        Row: {
+          id: string
+          mensagem_whatsapp: string
+          numero_whatsapp: string
+          perguntas: Json
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          mensagem_whatsapp?: string
+          numero_whatsapp?: string
+          perguntas?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          mensagem_whatsapp?: string
+          numero_whatsapp?: string
+          perguntas?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tb_consultas: {
         Row: {
           aluno_id: string | null
