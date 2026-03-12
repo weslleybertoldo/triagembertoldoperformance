@@ -35,9 +35,9 @@ const StepConfirmacao = ({ data, onHome }: Props) => {
           : "";
 
         let mensagem = script
-          .replaceAll("{nome}", data.nome ?? "")
-          .replaceAll("{data}", dataFormatada)
-          .replaceAll("{horario}", horaFormatada);
+          .split("{nome}").join(data.nome ?? "")
+          .split("{data}").join(dataFormatada)
+          .split("{horario}").join(horaFormatada);
 
         // Clean up any remaining template variables
         mensagem = mensagem.replace(/\{p_[a-z0-9_]+\}/g, "");

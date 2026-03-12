@@ -115,7 +115,7 @@ const AdminConfigTriagem = () => {
       const { error } = await supabase
         .from("tb_config_triagem")
         .update({
-          perguntas: config.perguntas as unknown as Record<string, unknown>[],
+          perguntas: JSON.parse(JSON.stringify(config.perguntas)),
           numero_whatsapp: config.numero_whatsapp,
           mensagem_whatsapp: config.mensagem_whatsapp,
           updated_at: new Date().toISOString(),
