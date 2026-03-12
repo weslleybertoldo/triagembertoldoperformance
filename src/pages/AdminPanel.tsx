@@ -427,6 +427,7 @@ const AdminPanel = () => {
         {tab === "alunos" && <AdminAlunos onCountChange={() => fetchCounts()} />}
         {tab === "config" && (
           <div className="space-y-8">
+            <AdminConfigTriagem />
             <AdminTags onTagsChange={fetchTags} />
             <AdminStats />
           </div>
