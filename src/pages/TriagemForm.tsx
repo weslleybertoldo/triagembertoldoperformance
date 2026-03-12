@@ -27,13 +27,9 @@ export interface TriagemData {
 // Fixed step keys
 type FixedStep = "nome" | "dados" | "whatsapp" | "agendamento";
 
-interface StepDef {
-  type: "fixed";
-  key: FixedStep;
-} | {
-  type: "dynamic";
-  pergunta: PerguntaConfig;
-}
+type StepDef =
+  | { type: "fixed"; key: FixedStep }
+  | { type: "dynamic"; pergunta: PerguntaConfig };
 
 const TriagemForm = () => {
   const navigate = useNavigate();
