@@ -4,34 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
-
-interface Pergunta {
-  id: string;
-  ordem: number;
-  texto: string;
-  tipo: string;
-}
-
-function gerarSlug(texto: string): string {
-  const stopwords = [
-    "qual", "e", "o", "a", "os", "as", "seu", "sua", "de", "do", "da",
-    "um", "uma", "ja", "voce", "tem", "alguma", "ou", "se", "sim", "ha",
-    "por", "que", "como", "quando", "sao", "esta", "estao",
-  ];
-  return (
-    "p_" +
-    texto
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s]/g, "")
-      .trim()
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !stopwords.includes(w))
-      .slice(0, 3)
-      .join("_") || "p_pergunta"
-  );
-}
+import { gerarSlug, type PerguntaConfig } from "@/lib/triagem-utils";
 
 interface Props {
   triagem: any;
@@ -40,7 +13,7 @@ interface Props {
 }
 
 const AdminTriagemDetail = ({ triagem, onBack, onExportPDF }: Props) => {
-  const [perguntas, setPerguntas] = useState<Pergunta[]>([]);
+  const [perguntas, setPerguntas] = useState<PerguntaConfig[]>([]);
   const respostas: Record<string, string> = triagem.respostas || {};
 
   useEffect(() => {
@@ -50,7 +23,7 @@ const AdminTriagemDetail = ({ triagem, onBack, onExportPDF }: Props) => {
       .limit(1)
       .single()
       .then(({ data }) => {
-        const ps = (data?.perguntas as unknown as Pergunta[]) || [];
+        const ps = (data?.perguntas as unknown as PerguntaConfig[]) || [];
         setPerguntas(ps.filter((p) => p.texto?.trim()));
       });
   }, []);
@@ -58,13 +31,10 @@ const AdminTriagemDetail = ({ triagem, onBack, onExportPDF }: Props) => {
   const fields = [
     { label: "Nome", value: triagem.nome },
     { label: "WhatsApp", value: triagem.whatsapp },
-    { label: "Objetivo", value: triagem.objetivo },
     { label: "Data Agendada", value: triagem.data_agendamento ? format(new Date(triagem.data_agendamento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "—" },
     { label: "Data Nascimento", value: triagem.data_nascimento || "—" },
     { label: "Peso", value: triagem.peso ? `${triagem.peso} kg` : "—" },
     { label: "Altura", value: triagem.altura ? `${triagem.altura} cm` : "—" },
-    { label: "Saúde", value: triagem.saude || "—" },
-    { label: "Como Conheceu", value: triagem.como_conheceu || "—" },
     { label: "Status", value: triagem.status },
   ];
 

@@ -4,41 +4,14 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2, ChevronUp, ChevronDown, Save } from "lucide-react";
-
-interface Pergunta {
-  id: string;
-  ordem: number;
-  texto: string;
-  tipo: "texto" | "opcoes";
-  opcoes: string[];
-}
+import { gerarSlug, type PerguntaConfig } from "@/lib/triagem-utils";
 
 interface Config {
   id: string;
-  perguntas: Pergunta[];
+  perguntas: PerguntaConfig[];
   numero_whatsapp: string;
   mensagem_whatsapp: string;
   updated_at: string;
-}
-
-function gerarSlugPergunta(texto: string): string {
-  const stopwords = [
-    "qual", "e", "o", "a", "os", "as", "seu", "sua", "de", "do", "da",
-    "um", "uma", "ja", "voce", "tem", "alguma", "ou", "se", "sim", "ha",
-    "por", "que", "como", "quando", "sao", "esta", "estao",
-  ];
-  return (
-    texto
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s]/g, "")
-      .trim()
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !stopwords.includes(w))
-      .slice(0, 3)
-      .join("_") || "pergunta"
-  );
 }
 
 const AdminConfigTriagem = () => {
@@ -55,7 +28,7 @@ const AdminConfigTriagem = () => {
         if (data) {
           setConfig({
             ...data,
-            perguntas: (data.perguntas as unknown as Pergunta[]) || [],
+            perguntas: (data.perguntas as unknown as PerguntaConfig[]) || [],
           } as Config);
         }
       });
@@ -63,10 +36,11 @@ const AdminConfigTriagem = () => {
 
   const adicionarPergunta = () => {
     if (!config) return;
-    const nova: Pergunta = {
+    const nova: PerguntaConfig = {
       id: crypto.randomUUID(),
       ordem: config.perguntas.length + 1,
       texto: "",
+      subtexto: "",
       tipo: "texto",
       opcoes: [],
     };
@@ -169,8 +143,8 @@ const AdminConfigTriagem = () => {
           <div className="flex flex-wrap gap-1.5">
             {config.perguntas.map((p) => {
               if (!p.texto?.trim()) return null;
-              const slug = gerarSlugPergunta(p.texto);
-              const varName = `{p_${slug}}`;
+              const slug = gerarSlug(p.texto);
+              const varName = `{${slug}}`;
               return (
                 <button
                   key={p.id}
@@ -237,9 +211,16 @@ const AdminConfigTriagem = () => {
               placeholder="Texto da pergunta..."
             />
 
+            <Input
+              value={p.subtexto || ""}
+              onChange={(e) => atualizarPergunta(p.id, "subtexto", e.target.value)}
+              placeholder="Subtexto (opcional)..."
+              className="text-sm"
+            />
+
             {p.texto?.trim() && (
               <div className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono bg-success/10 text-success border border-success/30">
-                variável no script: <strong>{`{p_${gerarSlugPergunta(p.texto)}}`}</strong>
+                variável no script: <strong>{`{${gerarSlug(p.texto)}}`}</strong>
               </div>
             )}
 
