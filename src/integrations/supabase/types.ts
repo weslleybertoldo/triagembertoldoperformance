@@ -43,6 +43,7 @@ export type Database = {
           nome: string
           objetivo: string | null
           peso: number | null
+          respostas: Json | null
           saude: string | null
           status: string | null
           tags: string[] | null
@@ -58,6 +59,7 @@ export type Database = {
           nome: string
           objetivo?: string | null
           peso?: number | null
+          respostas?: Json | null
           saude?: string | null
           status?: string | null
           tags?: string[] | null
@@ -73,6 +75,7 @@ export type Database = {
           nome?: string
           objetivo?: string | null
           peso?: number | null
+          respostas?: Json | null
           saude?: string | null
           status?: string | null
           tags?: string[] | null

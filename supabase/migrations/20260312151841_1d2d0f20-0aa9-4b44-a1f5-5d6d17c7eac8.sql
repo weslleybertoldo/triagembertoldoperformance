@@ -1,0 +1,1 @@
+ALTER TABLE public.tb_agendamentos_triagem ADD COLUMN IF NOT EXISTS respostas jsonb DEFAULT '{}'::jsonb;
