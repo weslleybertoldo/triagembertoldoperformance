@@ -35,7 +35,7 @@ const AdminPanel = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [tab, setTab] = useState<"triagens" | "alunos" | "config">("triagens");
+  const [tab, setTab] = useState<"triagens" | "alunos" | "stats" | "config">("triagens");
   const [triagens, setTriagens] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedTriagem, setSelectedTriagem] = useState<any | null>(null);
