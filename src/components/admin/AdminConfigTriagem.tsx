@@ -55,7 +55,7 @@ const AdminConfigTriagem = () => {
         if (data) {
           setConfig({
             ...data,
-            perguntas: (data.perguntas as Pergunta[]) || [],
+            perguntas: (data.perguntas as unknown as Pergunta[]) || [],
           } as Config);
         }
       });
