@@ -32,6 +32,21 @@ interface Aluno {
   email: string | null;
 }
 
+const NOMES_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const LISTA_MESES = (() => {
+  const meses = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    meses.push({
+      valor: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: `${NOMES_MESES[d.getMonth()]} ${d.getFullYear()}`,
+    });
+  }
+  return meses;
+})();
+
 interface Consulta {
   id: string;
   data_consulta: string;
