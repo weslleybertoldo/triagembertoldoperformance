@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      tb_admins: {
+        Row: {
+          criado_em: string | null
+          email: string
+          id: string
+        }
+        Insert: {
+          criado_em?: string | null
+          email: string
+          id?: string
+        }
+        Update: {
+          criado_em?: string | null
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       tb_agendamentos_triagem: {
         Row: {
           altura: number | null

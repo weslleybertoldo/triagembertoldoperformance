@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X, MessageCircle } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Search, Download, Tag, X, MessageCircle, BarChart2, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import AdminAlunos from "@/components/admin/AdminAlunos";
 import AdminStats from "@/components/admin/AdminStats";
 import AdminTags from "@/components/admin/AdminTags";
 import AdminConfigTriagem from "@/components/admin/AdminConfigTriagem";
+import AdminAdmins from "@/components/admin/AdminAdmins";
 import { adminApi } from "@/lib/admin-api";
 
 interface TagItem {
@@ -34,7 +35,7 @@ const AdminPanel = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [tab, setTab] = useState<"triagens" | "alunos" | "config">("triagens");
+  const [tab, setTab] = useState<"triagens" | "alunos" | "stats" | "config">("triagens");
   const [triagens, setTriagens] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedTriagem, setSelectedTriagem] = useState<any | null>(null);
@@ -254,23 +255,23 @@ const AdminPanel = () => {
       </header>
 
       <div className="flex border-b border-border">
-        {(["triagens", "alunos", "config"] as const).map((t) => (
+        {([
+          { key: "triagens" as const, label: "Triagens", badge: triagemAguardando },
+          { key: "alunos" as const, label: "Alunos", badge: consultasPendentes },
+          { key: "stats" as const, icon: <BarChart2 className="h-4 w-4" />, badge: 0 },
+          { key: "config" as const, icon: <Settings className="h-4 w-4" />, badge: 0 },
+        ]).map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`relative flex-1 py-3 text-sm font-heading font-medium transition-colors ${
-              tab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`relative flex-1 py-3 text-sm font-heading font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              tab === t.key ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t === "triagens" ? "Triagens" : t === "alunos" ? "Alunos" : "⚙️"}
-            {t === "triagens" && triagemAguardando > 0 && (
+            {t.icon || t.label}
+            {t.badge > 0 && (
               <span className="absolute -top-1 right-1/4 inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-success text-[10px] font-bold text-white px-1">
-                {triagemAguardando}
-              </span>
-            )}
-            {t === "alunos" && consultasPendentes > 0 && (
-              <span className="absolute -top-1 right-1/4 inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-success text-[10px] font-bold text-white px-1">
-                {consultasPendentes}
+                {t.badge}
               </span>
             )}
           </button>
@@ -425,11 +426,16 @@ const AdminPanel = () => {
         )}
 
         {tab === "alunos" && <AdminAlunos onCountChange={() => fetchCounts()} />}
+        {tab === "stats" && (
+          <div className="space-y-8">
+            <AdminStats />
+            <AdminTags onTagsChange={fetchTags} />
+          </div>
+        )}
         {tab === "config" && (
           <div className="space-y-8">
             <AdminConfigTriagem />
-            <AdminTags onTagsChange={fetchTags} />
-            <AdminStats />
+            <AdminAdmins />
           </div>
         )}
       </main>
