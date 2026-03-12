@@ -281,41 +281,66 @@ const AlunoArea = () => {
           {consultas.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhuma consulta agendada.</p>
           ) : (
-            <div className="space-y-3">
-              {consultas.map((c) => (
-                <div key={c.id} className="rounded-xl bg-card border border-border p-4 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">
-                      {format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </p>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[c.status] || ""}`}>
-                      {statusEmoji[c.status] || ""} {c.status}
-                    </span>
-                  </div>
-                  {c.observacao && (
-                    <p className="text-sm text-muted-foreground mt-2">{c.observacao}</p>
-                  )}
-                  {(c.status === "aguardando" || c.status === "confirmada") && (
-                    <div className="flex gap-3 mt-3">
-                      {canReschedule(c) && (
-                        <button
-                          onClick={() => openReschedule(c)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          ✏️ Reagendar
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setCancelTarget(c)}
-                        className="text-xs text-destructive hover:underline"
-                      >
-                        ❌ Cancelar
-                      </button>
+            <>
+              <div className="flex gap-2 items-center flex-wrap mb-3">
+                <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v === "all" ? "" : v); setMostrarTodas(false); }}>
+                  <SelectTrigger className="w-[180px] h-9 text-sm">
+                    <SelectValue placeholder="Todos os meses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os meses</SelectItem>
+                    {LISTA_MESES.map((m) => (
+                      <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {consultasFiltradas.length > 6 && !mostrarTodas && (
+                  <button onClick={() => setMostrarTodas(true)} className="text-xs text-primary hover:underline">
+                    Ver todas ({consultasFiltradas.length})
+                  </button>
+                )}
+                {mostrarTodas && (
+                  <button onClick={() => setMostrarTodas(false)} className="text-xs text-primary hover:underline">
+                    Mostrar menos
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {consultasVisiveis.map((c) => (
+                  <div key={c.id} className="rounded-xl bg-card border border-border p-4 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-foreground">
+                        {format(new Date(c.data_consulta), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[c.status] || ""}`}>
+                        {statusEmoji[c.status] || ""} {c.status}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    {c.observacao && (
+                      <p className="text-sm text-muted-foreground mt-2">{c.observacao}</p>
+                    )}
+                    {(c.status === "aguardando" || c.status === "confirmada") && (
+                      <div className="flex gap-3 mt-3">
+                        {canReschedule(c) && (
+                          <button
+                            onClick={() => openReschedule(c)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            ✏️ Reagendar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setCancelTarget(c)}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          ❌ Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </main>
