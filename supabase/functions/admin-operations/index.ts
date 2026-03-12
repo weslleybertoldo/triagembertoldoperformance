@@ -256,6 +256,40 @@ serve(async (req) => {
         return json({ data });
       }
 
+      // ===== ALL CONSULTAS =====
+      case "list_all_consultas": {
+        const { data, error } = await supabase
+          .from("tb_consultas")
+          .select("*")
+          .order("data_consulta", { ascending: false });
+        if (error) throw error;
+        return json({ data });
+      }
+
+      // ===== ADMINS =====
+      case "list_admins": {
+        const { data, error } = await supabase
+          .from("tb_admins")
+          .select("*")
+          .order("criado_em", { ascending: true });
+        if (error) throw error;
+        return json({ data });
+      }
+
+      case "create_admin": {
+        const { email } = params;
+        const { error } = await supabase.from("tb_admins").insert({ email });
+        if (error) throw error;
+        return json({ success: true });
+      }
+
+      case "delete_admin": {
+        const { id } = params;
+        const { error } = await supabase.from("tb_admins").delete().eq("id", id);
+        if (error) throw error;
+        return json({ success: true });
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: `Unknown action: ${action}` }),
