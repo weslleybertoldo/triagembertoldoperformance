@@ -47,6 +47,8 @@ const AlunoArea = () => {
   const [loading, setLoading] = useState(true);
   const [cancelTarget, setCancelTarget] = useState<Consulta | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [filtroMes, setFiltroMes] = useState("");
+  const [mostrarTodas, setMostrarTodas] = useState(false);
 
   // Reschedule state
   const [rescheduleTarget, setRescheduleTarget] = useState<Consulta | null>(null);
