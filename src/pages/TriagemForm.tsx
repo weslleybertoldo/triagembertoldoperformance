@@ -8,6 +8,7 @@ import StepWhatsapp from "@/components/triagem/StepWhatsapp";
 import StepSaude from "@/components/triagem/StepSaude";
 import StepAgendamento from "@/components/triagem/StepAgendamento";
 import StepComoConheceu from "@/components/triagem/StepComoConheceu";
+import StepPerguntasDinamicas from "@/components/triagem/StepPerguntasDinamicas";
 import StepConfirmacao from "@/components/triagem/StepConfirmacao";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,9 +23,10 @@ export interface TriagemData {
   saude: string;
   dataAgendamento: Date | null;
   comoConheceu: string;
+  respostas: Record<string, string>;
 }
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 const TriagemForm = () => {
   const navigate = useNavigate();
@@ -42,6 +44,7 @@ const TriagemForm = () => {
     saude: "",
     dataAgendamento: null,
     comoConheceu: "",
+    respostas: {},
   });
 
   const update = (fields: Partial<TriagemData>) =>
@@ -63,6 +66,7 @@ const TriagemForm = () => {
         saude: data.saude,
         data_agendamento: data.dataAgendamento?.toISOString(),
         como_conheceu: data.comoConheceu,
+        respostas: data.respostas,
       });
       if (error) throw error;
       setSubmitted(true);
@@ -79,7 +83,6 @@ const TriagemForm = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
       <header className="flex items-center gap-3 px-4 py-4">
         <button
           onClick={() => (step > 1 ? prev() : navigate("/"))}
@@ -92,7 +95,6 @@ const TriagemForm = () => {
         </h2>
       </header>
 
-      {/* Progress bar */}
       <div className="mx-4 mb-6">
         <div className="h-2 rounded-full bg-secondary">
           <div
@@ -105,15 +107,21 @@ const TriagemForm = () => {
         </p>
       </div>
 
-      {/* Steps */}
       <main className="flex flex-1 flex-col px-6 pb-8">
         {step === 1 && <StepNome data={data} update={update} onNext={next} />}
         {step === 2 && <StepDados data={data} update={update} onNext={next} />}
         {step === 3 && <StepObjetivo data={data} update={update} onNext={next} />}
         {step === 4 && <StepWhatsapp data={data} update={update} onNext={next} />}
         {step === 5 && <StepSaude data={data} update={update} onNext={next} />}
-        {step === 6 && <StepAgendamento data={data} update={update} onNext={next} />}
-        {step === 7 && (
+        {step === 6 && (
+          <StepPerguntasDinamicas
+            respostas={data.respostas}
+            onUpdate={(respostas) => update({ respostas })}
+            onNext={next}
+          />
+        )}
+        {step === 7 && <StepAgendamento data={data} update={update} onNext={next} />}
+        {step === 8 && (
           <StepComoConheceu
             data={data}
             update={update}

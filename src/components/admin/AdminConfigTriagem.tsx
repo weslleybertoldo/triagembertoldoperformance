@@ -237,6 +237,12 @@ const AdminConfigTriagem = () => {
               placeholder="Texto da pergunta..."
             />
 
+            {p.texto?.trim() && (
+              <div className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono bg-success/10 text-success border border-success/30">
+                variável no script: <strong>{`{p_${gerarSlugPergunta(p.texto)}}`}</strong>
+              </div>
+            )}
+
             <div className="flex gap-2 items-center">
               <label className="text-xs text-muted-foreground">Tipo:</label>
               <select
