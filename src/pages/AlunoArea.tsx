@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 import AlunoScheduler from "@/components/aluno/AlunoScheduler";
 import MeusDados from "@/components/aluno/MeusDados";
 import InstallAppButton from "@/components/pwa/InstallAppButton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
