@@ -168,24 +168,50 @@ const AdminPanel = () => {
 
   const exportPDF = async (triagem: any) => {
     const { default: jsPDF } = await import("jspdf");
+    const { gerarSlug } = await import("@/lib/triagem-utils");
+
+    // Fetch dynamic questions from config
+    const { data: cfg } = await supabase
+      .from("tb_config_triagem")
+      .select("perguntas")
+      .limit(1)
+      .single();
+    const perguntas = ((cfg?.perguntas as unknown as any[]) || []).filter((p: any) => p.texto?.trim());
+    const respostas: Record<string, string> = triagem.respostas || {};
+
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text("Team Bertoldo — Ficha de Triagem", 20, 20);
     doc.setFontSize(12);
-    const lines = [
-      `Nome: ${triagem.nome}`,
-      `WhatsApp: ${triagem.whatsapp || ""}`,
-      `Objetivo: ${triagem.objetivo || ""}`,
-      `Data Agendada: ${triagem.data_agendamento ? format(new Date(triagem.data_agendamento), "dd/MM/yyyy HH:mm") : ""}`,
-      `Data Nascimento: ${triagem.data_nascimento || ""}`,
-      `Peso: ${triagem.peso || ""} kg`,
-      `Altura: ${triagem.altura || ""} cm`,
-      `Saúde: ${triagem.saude || ""}`,
-      `Como Conheceu: ${triagem.como_conheceu || ""}`,
-      `Status: ${triagem.status}`,
-      `Tags: ${(triagem.tags || []).join(", ")}`,
-    ];
-    lines.forEach((line, i) => doc.text(line, 20, 40 + i * 10));
+
+    let y = 40;
+    const addLine = (text: string) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(text, 20, y);
+      y += 10;
+    };
+
+    addLine(`Nome: ${triagem.nome}`);
+    addLine(`WhatsApp: ${triagem.whatsapp || ""}`);
+    addLine(`Data Agendada: ${triagem.data_agendamento ? format(new Date(triagem.data_agendamento), "dd/MM/yyyy HH:mm") : ""}`);
+    addLine(`Data Nascimento: ${triagem.data_nascimento || ""}`);
+    addLine(`Peso: ${triagem.peso || ""} kg`);
+    addLine(`Altura: ${triagem.altura || ""} cm`);
+    addLine(`Status: ${triagem.status}`);
+    addLine(`Tags: ${(triagem.tags || []).join(", ")}`);
+
+    // Dynamic questions
+    if (perguntas.length > 0) {
+      addLine("");
+      perguntas.forEach((p: any, idx: number) => {
+        const slug = gerarSlug(p.texto);
+        const resposta = respostas[slug] || "Sem resposta";
+        addLine(`Pergunta ${idx + 1} — ${p.texto}`);
+        addLine(`Resposta: ${resposta}`);
+        addLine("");
+      });
+    }
+
     doc.setFontSize(10);
     doc.text("By Weslley Bertoldo", 20, 280);
     doc.save(`triagem-${triagem.nome}.pdf`);
