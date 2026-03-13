@@ -23,18 +23,29 @@ interface Props {
 }
 
 const StepAgendamento = ({ data, update, onNext }: Props) => {
-  const [weekOffset, setWeekOffset] = useState(0);
+  const today = startOfDay(new Date());
+
+  // Auto-advance if current week has no future days (excluding today)
+  const getInitialOffset = () => {
+    const ws = startOfWeek(today, { weekStartsOn: 1 });
+    const we = endOfWeek(today, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: ws, end: we }).filter(
+      (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
+    );
+    return days.length === 0 ? 1 : 0;
+  };
+
+  const [weekOffset, setWeekOffset] = useState(getInitialOffset);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [bookedSlots, setBookedSlots] = useState<Date[]>([]);
 
-  const today = startOfDay(new Date());
   const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const currentWeekEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
 
   const weekDays = useMemo(
     () =>
       eachDayOfInterval({ start: currentWeekStart, end: currentWeekEnd }).filter(
-        (d) => !isWeekend(d) && !isBefore(d, today)
+        (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
       ),
     [weekOffset]
   );

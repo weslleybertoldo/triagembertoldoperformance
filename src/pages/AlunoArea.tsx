@@ -182,7 +182,7 @@ const AlunoArea = () => {
   const rwStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const rwEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const rwDays = eachDayOfInterval({ start: rwStart, end: rwEnd }).filter(
-    (d) => !isWeekend(d) && !isBefore(d, today)
+    (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
   );
   const rescheduleSlots = selectedDay ? generateSlots(selectedDay) : [];
 
