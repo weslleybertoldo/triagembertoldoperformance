@@ -15,18 +15,28 @@ interface Props {
 
 const AlunoScheduler = ({ alunoId, onBooked, consultas }: Props) => {
   const { toast } = useToast();
-  const [weekOffset, setWeekOffset] = useState(0);
+  const today = startOfDay(new Date());
+
+  const getInitialOffset = () => {
+    const ws = startOfWeek(today, { weekStartsOn: 1 });
+    const we = endOfWeek(today, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: ws, end: we }).filter(
+      (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
+    );
+    return days.length === 0 ? 1 : 0;
+  };
+
+  const [weekOffset, setWeekOffset] = useState(getInitialOffset);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<Date[]>([]);
 
-  const today = startOfDay(new Date());
   const weekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
 
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
-    (d) => !isWeekend(d) && !isBefore(d, today)
+    (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
   );
 
   // Check if student already has active appointment this week

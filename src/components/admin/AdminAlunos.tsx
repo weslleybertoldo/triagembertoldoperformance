@@ -302,7 +302,7 @@ const AdminAlunos = ({ onCountChange }: Props) => {
   const wStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const wEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: wStart, end: wEnd }).filter(
-    (d) => !isWeekend(d) && !isBefore(d, today)
+    (d) => !isWeekend(d) && !isBefore(d, today) && !isSameDay(d, today)
   );
   const slots = selectedDay ? generateSlots(selectedDay) : [];
 
