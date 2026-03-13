@@ -77,8 +77,7 @@ const TriagemForm = () => {
         { type: "fixed", key: "dados" },
         { type: "fixed", key: "whatsapp" },
         ...perguntas
-          .sort((a, b) => a.ordem - b.ordem)
-          .map((p): StepDef => ({ type: "dynamic", pergunta: p })),
+          .map((p, idx): StepDef => ({ type: "dynamic", pergunta: { ...p, ordem: idx } })),
         { type: "fixed", key: "agendamento" },
       ];
 
