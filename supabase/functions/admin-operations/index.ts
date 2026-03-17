@@ -40,7 +40,7 @@ async function verifyAdminToken(token: string): Promise<boolean> {
 
     const signatureInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
     const signature = base64urlDecode(parts[2]);
-    return await crypto.subtle.verify("HMAC", key, signature, signatureInput);
+    return await crypto.subtle.verify("HMAC", key, new Uint8Array(signature) as ArrayBufferView<ArrayBuffer>, signatureInput);
   } catch {
     return false;
   }
@@ -309,9 +309,9 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
-  } catch (e) {
+  } catch (e: unknown) {
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: (e as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
