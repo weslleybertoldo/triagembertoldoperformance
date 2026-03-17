@@ -40,7 +40,7 @@ async function verifyAdminToken(token: string): Promise<boolean> {
 
     const signatureInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
     const signature = base64urlDecode(parts[2]);
-    return await crypto.subtle.verify("HMAC", key, signature, signatureInput);
+    return await crypto.subtle.verify("HMAC", key, new Uint8Array(signature) as ArrayBufferView<ArrayBuffer>, signatureInput);
   } catch {
     return false;
   }
