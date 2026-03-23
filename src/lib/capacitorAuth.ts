@@ -1,20 +1,18 @@
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
-import { App } from "@capacitor/app";
 import { supabase } from "@/integrations/supabase/client";
 
 const isNative = Capacitor.isNativePlatform();
-const REDIRECT_SCHEME = "com.bertoldo.triagem";
-const REDIRECT_URL = `${REDIRECT_SCHEME}://login-callback`;
+const SITE_URL = "https://triagembertoldoperformance.lovable.app";
 
 /**
  * Inicia o login com Google.
- * - No APK: abre browser externo, captura o redirect via deep link
+ * - No APK: abre browser externo com redirect para o site HTTPS (já permitido no Supabase)
+ *   Quando o usuário fecha o browser, verifica se a sessão foi criada.
  * - No PWA: usa o fluxo normal de redirect do Supabase
  */
 export async function signInWithGoogle(): Promise<{ error?: string }> {
   if (!isNative) {
-    // PWA — fluxo normal
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -25,13 +23,12 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
     return {};
   }
 
-  // APK — fluxo com deep link
+  // APK — abre OAuth no browser, redirect para o site HTTPS
   try {
-    // 1. Pega a URL do OAuth sem redirecionar automaticamente
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: REDIRECT_URL,
+        redirectTo: SITE_URL,
         skipBrowserRedirect: true,
       },
     });
@@ -40,104 +37,44 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
       return { error: error?.message || "Erro ao iniciar login" };
     }
 
-    // 2. Configura listener para capturar o deep link ANTES de abrir o browser
+    // Escuta quando o browser fecha (usuário volta pro app)
     const sessionPromise = new Promise<{ error?: string }>((resolve) => {
       const timeout = setTimeout(() => {
         resolve({ error: "Login cancelado ou expirado" });
-      }, 120000); // 2 min timeout
+      }, 180000); // 3 min
 
-      const handleUrl = async (event: { url: string }) => {
-        if (!event.url.startsWith(REDIRECT_SCHEME)) return;
-
+      const checkSession = async () => {
         clearTimeout(timeout);
+        // Aguarda um momento para o Supabase processar
+        await new Promise(r => setTimeout(r, 1000));
 
-        try {
-          // Extrai os tokens da URL de callback
-          // URL format: com.bertoldo.triagem://login-callback#access_token=...&refresh_token=...
-          const url = event.url;
-          const hashPart = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
-
-          if (!hashPart) {
-            resolve({ error: "Resposta de login inválida" });
-            return;
-          }
-
-          const params = new URLSearchParams(hashPart);
-          const accessToken = params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (sessionError) {
-              resolve({ error: sessionError.message });
-            } else {
-              // Força buscar user completo (com user_metadata, avatar_url, etc)
-              await supabase.auth.getUser();
-              resolve({});
-            }
-          } else {
-            // Pode ter retornado com error
-            const errorDesc = params.get("error_description") || params.get("error");
-            resolve({ error: errorDesc || "Tokens não recebidos" });
-          }
-        } catch (e) {
-          resolve({ error: "Erro ao processar login" });
+        // Verifica se uma sessão foi criada
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.auth.getUser();
+          resolve({});
+        } else {
+          resolve({ error: "Login não concluído. Tente novamente." });
         }
-
-        // Fecha o browser
-        try {
-          await Browser.close();
-        } catch {}
       };
 
-      // Escuta o deep link
-      App.addListener("appUrlOpen", handleUrl);
+      Browser.addListener("browserFinished", checkSession);
 
-      // Limpa o listener após resolução
       sessionPromise.then(() => {
-        App.removeAllListeners();
+        Browser.removeAllListeners();
       });
     });
 
-    // 3. Abre o browser com a URL do OAuth
-    await Browser.open({ url: data.url, windowName: "_self" });
-
-    // 4. Espera o resultado
+    await Browser.open({ url: data.url });
     return await sessionPromise;
-  } catch (e) {
+  } catch {
     return { error: "Erro ao abrir login do Google" };
   }
 }
 
 /**
- * Inicializa listener de deep links para o app (deve ser chamado uma vez no boot)
+ * Inicializa listener (simplificado — sem deep link necessário)
  */
 export function setupDeepLinkListener() {
-  if (!isNative) return;
-
-  App.addListener("appUrlOpen", async ({ url }) => {
-    // Se receber um deep link com tokens (ex: após OAuth), processa
-    if (url.startsWith(REDIRECT_SCHEME) && url.includes("access_token")) {
-      const hashPart = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
-      if (!hashPart) return;
-
-      const params = new URLSearchParams(hashPart);
-      const accessToken = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-
-      if (accessToken && refreshToken) {
-        await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        try {
-          await Browser.close();
-        } catch {}
-      }
-    }
-  });
+  // Não precisa de deep link — usa redirect HTTPS
 }
