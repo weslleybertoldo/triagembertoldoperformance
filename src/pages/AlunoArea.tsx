@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, RefreshCw, Check, Download } from "lucide-react";
+import { CURRENT_VERSION } from "@/components/UpdateChecker";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isWeekend, isBefore, startOfDay, isSameDay } from "date-fns";
@@ -345,9 +346,44 @@ const AlunoArea = () => {
         </section>
       </main>
 
-      <footer className="px-4 py-3 space-y-3">
+      <footer className="px-4 py-3 space-y-2 text-center">
         <InstallAppButton />
-        <p className="text-center text-sm text-muted-foreground">By Weslley Bertoldo</p>
+        <p className="text-sm text-muted-foreground">By Weslley Bertoldo</p>
+        <p className="text-[10px] text-muted-foreground/50">v{CURRENT_VERSION}</p>
+        <button
+          type="button"
+          id="check-update-btn"
+          onClick={async () => {
+            const btn = document.getElementById('check-update-btn') as HTMLButtonElement;
+            const result = document.getElementById('update-result');
+            if (!result) return;
+            btn.disabled = true;
+            btn.textContent = '↻ Verificando...';
+            result.style.display = 'none';
+            try {
+              const res = await fetch('https://api.github.com/repos/weslleybertoldo/triagembertoldoperformance/releases/latest', { cache: 'no-store' });
+              const release = await res.json();
+              const rv = (release.tag_name || '').replace(/^v/, '');
+              const r = rv.split('.').map(Number);
+              const l = CURRENT_VERSION.split('.').map(Number);
+              const newer = r[0]>l[0] || (r[0]===l[0]&&r[1]>l[1]) || (r[0]===l[0]&&r[1]===l[1]&&r[2]>l[2]);
+              result.style.display = 'block';
+              if (newer) {
+                const apk = (release.assets||[]).find((a:any)=>a.name.endsWith('.apk'));
+                result.innerHTML = `<a href="${apk?.browser_download_url||release.html_url}" target="_blank" class="text-primary">⬇ Baixar v${rv}</a>`;
+              } else {
+                result.innerHTML = '<span class="text-green-500">✓ Versão mais recente</span>';
+              }
+            } catch { result.style.display = 'block'; result.innerHTML = '<span class="text-green-500">✓ Versão mais recente</span>'; }
+            btn.disabled = false;
+            btn.textContent = '↻ Verificar atualizações';
+          }}
+          className="text-[10px] text-muted-foreground/60 hover:text-primary transition-colors mx-auto flex items-center gap-1"
+        >
+          <RefreshCw size={10} />
+          Verificar atualizações
+        </button>
+        <p id="update-result" className="text-[10px]" style={{ display: 'none' }}></p>
       </footer>
 
       {/* Cancel Dialog */}
