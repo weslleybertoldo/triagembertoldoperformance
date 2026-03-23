@@ -10,6 +10,9 @@ import AlunoArea from "./pages/AlunoArea";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import InstallBanner from "./components/pwa/InstallBanner";
+import { setupDeepLinkListener } from "@/lib/capacitorAuth";
+
+setupDeepLinkListener();
 
 const queryClient = new QueryClient();
 

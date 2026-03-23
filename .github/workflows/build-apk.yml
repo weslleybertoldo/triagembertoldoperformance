@@ -1,0 +1,80 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+      - uses: android-actions/setup-android@v3
+
+      - name: Get version
+        id: version
+        run: echo "current=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/triagem-release.keystore
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew
+
+      - name: Build signed APK
+        run: cd android && ./gradlew assembleRelease
+        env:
+          KEYSTORE_FILE: triagem-release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename APK
+        run: |
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          mv "$APK" android/app/build/outputs/apk/release/TeamBertoldo.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TeamBertoldo
+          path: android/app/build/outputs/apk/release/TeamBertoldo.apk
+          retention-days: 30
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.current }}
+          name: Team Bertoldo v${{ steps.version.outputs.current }}
+          body: |
+            ## Team Bertoldo v${{ steps.version.outputs.current }}
+            APK gerado automaticamente.
+          files: android/app/build/outputs/apk/release/TeamBertoldo.apk
+          generate_release_notes: true
+          make_latest: true
+
+      - name: Bump version
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$NEXT';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git diff --staged --quiet || git commit -m "chore: bump version to v$NEXT [skip ci]"
+          git push

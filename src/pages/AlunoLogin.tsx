@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { signInWithGoogle } from "@/lib/capacitorAuth";
 import { useToast } from "@/hooks/use-toast";
+import { CURRENT_VERSION } from "@/components/UpdateChecker";
 
 const AlunoLogin = () => {
   const navigate = useNavigate();
@@ -58,10 +59,23 @@ const AlunoLogin = () => {
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/aluno",
-    });
-    if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
+    setLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.error) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" });
+      } else {
+        navigate("/aluno");
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message || "Erro ao entrar com Google", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckUpdate = () => {
+    window.location.reload();
   };
 
   return (
@@ -130,6 +144,17 @@ const AlunoLogin = () => {
           </button>
         </div>
       </main>
+
+      <div className="flex flex-col items-center gap-2 pb-6">
+        <p className="text-xs text-muted-foreground/50">v{CURRENT_VERSION}</p>
+        <button
+          onClick={handleCheckUpdate}
+          className="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Verificar atualizações
+        </button>
+      </div>
     </div>
   );
 };
